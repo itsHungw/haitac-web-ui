@@ -95,6 +95,7 @@ export function Header({ user, isLoading, onOpenLogin, onOpenRegister, onLogout 
             ) : user ? (
               <>
                 <span className="account-chip">THUYỀN TRƯỞNG <strong>{user.user}</strong></span>
+                {user.admin && <Link className="header-admin-link" href="/admin">Quản trị</Link>}
                 <button className="header-link-button" type="button" onClick={onLogout}>Thoát</button>
               </>
             ) : (
@@ -148,6 +149,7 @@ export function Header({ user, isLoading, onOpenLogin, onOpenRegister, onLogout 
             {user ? (
               <>
                 <span>Xin chào, <strong>{user.user}</strong></span>
+                {user.admin && <Link href="/admin" onClick={closeMenu}>Quản trị</Link>}
                 <button type="button" onClick={() => { onLogout(); closeMenu(); }}>Đăng xuất</button>
               </>
             ) : (
