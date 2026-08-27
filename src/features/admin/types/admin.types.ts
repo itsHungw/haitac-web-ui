@@ -155,7 +155,6 @@ export interface AdminFashionItem {
   mwear: string;
   op: string;
   price: number;
-  isForSale: boolean;
 }
 
 

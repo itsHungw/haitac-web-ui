@@ -87,8 +87,8 @@ export const adminService = {
     return apiClient.get<AdminFashionItem[]>('admin/fashion');
   },
 
-  updateFashionPrice(id: number, price: number): Promise<AdminFashionItem> {
-    return apiClient.put<AdminFashionItem>(`admin/fashion/${id}`, { price });
+  updateFashion(id: number, payload: Partial<AdminFashionItem>): Promise<AdminFashionItem> {
+    return apiClient.put<AdminFashionItem>(`admin/fashion/${id}`, payload);
   },
 
   bulkUpdateFashionPrice(payload: { itemIds: number[]; price: number }): Promise<{ affectedCount: number }> {

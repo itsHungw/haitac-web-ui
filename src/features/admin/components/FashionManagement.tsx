@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { extractErrorMessage } from '@/lib/api/errors';
 import { adminService } from '../services/admin.service';
 import type { AdminFashionItem } from '../types/admin.types';
+import { Search, Loader2, Edit2, ShieldAlert, CheckCircle2, XCircle, Tag, BookmarkPlus, FolderOpen, Save, Trash2, X, PlusCircle } from 'lucide-react';
 
 const STATUS_TABS = [
   { key: 'ALL', label: 'Tất cả' },
@@ -23,6 +24,34 @@ export function FashionManagement() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [bulkPriceInput, setBulkPriceInput] = useState<number>(5000);
   const [showBulkModal, setShowBulkModal] = useState(false);
+
+  // Full Edit Modal State
+  const [editItem, setEditItem] = useState<AdminFashionItem | null>(null);
+  const [editForm, setEditForm] = useState<Partial<AdminFashionItem>>({});
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  // Local Groups State (Drafts)
+  const [savedGroups, setSavedGroups] = useState<{name: string, ids: number[]}[]>([]);
+  const [showSaveGroupModal, setShowSaveGroupModal] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [showLoadGroupModal, setShowLoadGroupModal] = useState(false);
+
+  useEffect(() => {
+    // Load local groups
+    const groups = localStorage.getItem('htth_admin_fashion_groups');
+    if (groups) {
+      try {
+        setSavedGroups(JSON.parse(groups));
+      } catch (e) {
+        // ignore
+      }
+    }
+  }, []);
+
+  const saveLocalGroups = (groups: {name: string, ids: number[]}[]) => {
+    setSavedGroups(groups);
+    localStorage.setItem('htth_admin_fashion_groups', JSON.stringify(groups));
+  };
 
   async function loadData() {
     setLoading(true);
@@ -44,24 +73,24 @@ export function FashionManagement() {
 
   const stats = useMemo(() => {
     const total = items.length;
-    const forSale = items.filter((i) => i.isForSale).length;
+    const forSale = items.filter((i) => i.price >= 0).length;
     const locked = total - forSale;
     return { total, forSale, locked };
   }, [items]);
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
-      const matchSearch =
-        searchQuery.trim() === '' ||
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.info.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        String(item.id).includes(searchQuery);
+      const isForSale = item.price >= 0;
+      if (activeTab === 'FOR_SALE' && !isForSale) return false;
+      if (activeTab === 'LOCKED' && isForSale) return false;
 
-      if (!matchSearch) return false;
-
-      if (activeTab === 'ALL') return true;
-      if (activeTab === 'FOR_SALE') return item.isForSale;
-      if (activeTab === 'LOCKED') return !item.isForSale;
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        return (
+          item.name.toLowerCase().includes(query) ||
+          item.id.toString().includes(query)
+        );
+      }
       return true;
     });
   }, [items, activeTab, searchQuery]);
@@ -70,431 +99,515 @@ export function FashionManagement() {
     if (selectedIds.length === filteredItems.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(filteredItems.map((i) => i.id));
+      setSelectedIds(filteredItems.map(i => i.id));
     }
   };
 
   const toggleSelect = (id: number) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
+    if (selectedIds.includes(id)) {
+      setSelectedIds(selectedIds.filter(i => i !== id));
+    } else {
+      setSelectedIds([...selectedIds, id]);
+    }
   };
 
-  async function handleToggleSingle(item: AdminFashionItem) {
-    const targetPrice = item.isForSale ? -1 : 5000;
-    setActionLoading(`item-${item.id}`);
-    setError(null);
-    setSuccess(null);
-    try {
-      const updated = await adminService.updateFashionPrice(item.id, targetPrice);
-      setItems((prev) => prev.map((i) => (i.id === item.id ? updated : i)));
-      setSuccess(`Đã ${targetPrice >= 0 ? 'mở bán' : 'khóa bán'} trang phục "${item.name}".`);
-    } catch (err) {
-      setError(extractErrorMessage(err, 'Không thể cập nhật trạng thái trang phục.'));
-    } finally {
-      setActionLoading(null);
-    }
-  }
+  const showNotification = (msg: string, isError = false) => {
+    if (isError) setError(msg);
+    else setSuccess(msg);
+    setTimeout(() => {
+      setError(null);
+      setSuccess(null);
+    }, 4000);
+  };
 
-  async function handleBulkUpdate(price: number) {
+  const handleBulkUpdatePrice = async () => {
     if (selectedIds.length === 0) return;
-    setActionLoading('bulk-update');
-    setError(null);
-    setSuccess(null);
     try {
-      const res = await adminService.bulkUpdateFashionPrice({
+      setActionLoading('bulk_update');
+      await adminService.bulkUpdateFashionPrice({
         itemIds: selectedIds,
-        price: price,
+        price: bulkPriceInput
       });
-      setSuccess(`Đã cập nhật giá bán thành công cho ${res.affectedCount} trang phục.`);
+      showNotification(`Cập nhật thành công ${selectedIds.length} cải trang!`);
       setShowBulkModal(false);
       setSelectedIds([]);
       await loadData();
     } catch (err) {
-      setError(extractErrorMessage(err, 'Không thể cập nhật hàng loạt.'));
+      showNotification(extractErrorMessage(err, 'Lỗi cập nhật giá.'), true);
     } finally {
       setActionLoading(null);
     }
+  };
+
+  const openEditModal = (item: AdminFashionItem) => {
+    setEditItem(item);
+    setEditForm({ ...item });
+    setShowEditModal(true);
+  };
+
+  const handleFullUpdate = async () => {
+    if (!editItem) return;
+    try {
+      setActionLoading('full_update');
+      await adminService.updateFashion(editItem.id, editForm);
+      showNotification(`Đã lưu thay đổi cho cải trang #${editItem.id}`);
+      setShowEditModal(false);
+      await loadData();
+    } catch (err) {
+      showNotification(extractErrorMessage(err, 'Lỗi cập nhật cải trang.'), true);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleSaveGroup = () => {
+    if (!newGroupName.trim() || selectedIds.length === 0) return;
+    const newGroups = [...savedGroups, { name: newGroupName.trim(), ids: selectedIds }];
+    saveLocalGroups(newGroups);
+    setNewGroupName('');
+    setShowSaveGroupModal(false);
+    showNotification(`Đã lưu nhóm sự kiện: ${newGroupName}`);
+  };
+
+  const handleDeleteGroup = (idx: number) => {
+    const newGroups = [...savedGroups];
+    newGroups.splice(idx, 1);
+    saveLocalGroups(newGroups);
+  };
+
+  const handleLoadGroup = (ids: number[]) => {
+    setSelectedIds(ids);
+    setShowLoadGroupModal(false);
+    showNotification(`Đã chọn ${ids.length} cải trang từ nhóm.`);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-emerald-500" />
+      </div>
+    );
   }
 
   return (
-    <div className="admin-page admin-fashion-page" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <section className="admin-page-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="space-y-8 animate-in fade-in duration-500 pb-24">
+      {/* Header & Stats */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <span style={{ fontSize: '12px', fontWeight: 700, color: '#e11d48', letterSpacing: '1px' }}>LIVE OPERATIONS / CẢI TRANG</span>
-          <h1 style={{ margin: '8px 0', fontSize: '28px', color: '#0f172a' }}>Quản lý Cải Trang</h1>
-          <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>Tìm kiếm, chọn lọc và định giá mở bán các bộ Cải trang trực tiếp trên Game Server.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Cải trang</h1>
+          <p className="text-zinc-400">Quản lý kho cải trang, thiết lập giá bán và phát hành sự kiện.</p>
         </div>
-        <div style={{ display: 'flex', gap: '16px' }}>
-          <div style={{ padding: '12px 20px', background: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', textAlign: 'center', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-            <small style={{ color: '#64748b', fontSize: '11px', display: 'block', fontWeight: 700, letterSpacing: '0.5px' }}>TỔNG SỐ</small>
-            <strong style={{ fontSize: '24px', color: '#0f172a' }}>{stats.total}</strong>
+        
+        <div className="flex gap-4">
+          <div className="rounded-xl border border-white/10 bg-black/40 px-6 py-4 backdrop-blur-md">
+            <p className="text-sm font-medium text-zinc-400">Đang mở bán</p>
+            <p className="text-2xl font-bold text-emerald-400">{stats.forSale}</p>
           </div>
-          <div style={{ padding: '12px 20px', background: '#f0fdf4', borderRadius: '16px', border: '1px solid #bbf7d0', textAlign: 'center', boxShadow: '0 4px 6px -1px rgba(22, 163, 74, 0.1)' }}>
-            <small style={{ color: '#16a34a', fontSize: '11px', display: 'block', fontWeight: 700, letterSpacing: '0.5px' }}>ĐANG MỞ BÁN</small>
-            <strong style={{ fontSize: '24px', color: '#15803d' }}>{stats.forSale}</strong>
+          <div className="rounded-xl border border-white/10 bg-black/40 px-6 py-4 backdrop-blur-md">
+            <p className="text-sm font-medium text-zinc-400">Đang khóa</p>
+            <p className="text-2xl font-bold text-rose-400">{stats.locked}</p>
           </div>
-          <div style={{ padding: '12px 20px', background: '#fef2f2', borderRadius: '16px', border: '1px solid #fecaca', textAlign: 'center', boxShadow: '0 4px 6px -1px rgba(220, 38, 38, 0.1)' }}>
-            <small style={{ color: '#dc2626', fontSize: '11px', display: 'block', fontWeight: 700, letterSpacing: '0.5px' }}>ĐANG KHÓA</small>
-            <strong style={{ fontSize: '24px', color: '#b91c1c' }}>{stats.locked}</strong>
+          <div className="rounded-xl border border-white/10 bg-black/40 px-6 py-4 backdrop-blur-md">
+            <p className="text-sm font-medium text-zinc-400">Tổng cộng</p>
+            <p className="text-2xl font-bold text-zinc-100">{stats.total}</p>
           </div>
         </div>
-      </section>
+      </div>
 
+      {/* Notifications */}
       {error && (
-        <div style={{ padding: '16px 20px', background: '#fef2f2', borderLeft: '4px solid #ef4444', borderRadius: '8px', color: '#991b1b', display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 2px 4px rgba(239, 68, 68, 0.1)' }}>
-          <span style={{ fontSize: '20px' }}>⚠️</span>
-          <div>
-            <strong style={{ display: 'block', fontSize: '14px', marginBottom: '2px' }}>Có lỗi xảy ra</strong>
-            <span style={{ fontSize: '13px', opacity: 0.9 }}>{error}</span>
-          </div>
+        <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-4 text-rose-400 flex items-center gap-3">
+          <ShieldAlert className="h-5 w-5" />
+          {error}
         </div>
       )}
       {success && (
-        <div style={{ padding: '16px 20px', background: '#f0fdf4', borderLeft: '4px solid #22c55e', borderRadius: '8px', color: '#166534', display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 2px 4px rgba(34, 197, 94, 0.1)' }}>
-          <span style={{ fontSize: '20px' }}>✨</span>
-          <div>
-            <strong style={{ display: 'block', fontSize: '14px', marginBottom: '2px' }}>Thành công</strong>
-            <span style={{ fontSize: '13px', opacity: 0.9 }}>{success}</span>
-          </div>
+        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-emerald-400 flex items-center gap-3">
+          <CheckCircle2 className="h-5 w-5" />
+          {success}
         </div>
       )}
 
-      {/* Bulk Action Bar */}
-      {selectedIds.length > 0 && (
-        <div
-          style={{
-            position: 'sticky',
-            top: '24px',
-            zIndex: 50,
-            background: '#0f172a',
-            color: '#fff',
-            padding: '16px 24px',
-            borderRadius: '16px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2)',
-            border: '1px solid #1e293b',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ background: '#3b82f6', color: '#fff', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '14px' }}>
-              {selectedIds.length}
-            </div>
-            <div>
-              <span style={{ fontSize: '15px', fontWeight: 600, display: 'block' }}>Mục đã chọn</span>
-              <span style={{ color: '#94a3b8', fontSize: '12px' }}>Có thể thực hiện thao tác hàng loạt</span>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
+      {/* Controls: Search, Tabs, Group Actions */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-black/20 p-2 rounded-2xl border border-white/5">
+        <div className="flex rounded-xl bg-black/40 p-1">
+          {STATUS_TABS.map((tab) => (
             <button
-              onClick={() => handleBulkUpdate(-1)}
-              disabled={actionLoading !== null}
-              style={{
-                padding: '10px 18px',
-                background: '#334155',
-                color: '#f87171',
-                border: '1px solid #475569',
-                borderRadius: '8px',
-                fontWeight: 600,
-                fontSize: '13px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
-              onMouseOver={(e) => (e.currentTarget.style.background = '#475569')}
-              onMouseOut={(e) => (e.currentTarget.style.background = '#334155')}
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+                activeTab === tab.key
+                  ? 'bg-zinc-800 text-white shadow-sm'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
+              }`}
             >
-              {actionLoading === 'bulk-update' ? 'Đang xử lý...' : 'Khóa bán tất cả (-1)'}
+              {tab.label}
             </button>
-            <button
-              onClick={() => setShowBulkModal(true)}
-              disabled={actionLoading !== null}
-              style={{
-                padding: '10px 18px',
-                background: '#3b82f6',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: 600,
-                fontSize: '13px',
-                cursor: 'pointer',
-                boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3)',
-                transition: 'all 0.2s',
-              }}
-              onMouseOver={(e) => (e.currentTarget.style.background = '#2563eb')}
-              onMouseOut={(e) => (e.currentTarget.style.background = '#3b82f6')}
-            >
-              Thiết lập giá mở bán...
-            </button>
-          </div>
+          ))}
         </div>
-      )}
 
-      <section className="admin-data-panel" style={{ background: '#fff', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-        <header style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {STATUS_TABS.map((tab) => (
-              <button
-                type="button"
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: activeTab === tab.key ? '#0f172a' : 'transparent',
-                  color: activeTab === tab.key ? '#fff' : '#475569',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                }}
-                onMouseOver={(e) => { if (activeTab !== tab.key) e.currentTarget.style.background = '#f1f5f9' }}
-                onMouseOut={(e) => { if (activeTab !== tab.key) e.currentTarget.style.background = 'transparent' }}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <button
-              type="button"
-              onClick={() => void loadData()}
-              disabled={loading}
-              style={{
-                padding: '9px 16px',
-                background: '#fff',
-                color: '#334155',
-                border: '1px solid #cbd5e1',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontWeight: 600,
-                fontSize: '13px',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-              }}
-            >
-              {loading ? 'Đang tải…' : 'Làm mới'}
-            </button>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <button 
+            onClick={() => setShowLoadGroupModal(true)}
+            className="flex items-center gap-2 rounded-xl bg-indigo-500/10 px-4 py-2 text-sm font-medium text-indigo-400 transition-colors hover:bg-indigo-500/20"
+          >
+            <FolderOpen className="h-4 w-4" />
+            Tải nhóm ({savedGroups.length})
+          </button>
+          
+          <div className="relative group w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500 transition-colors group-focus-within:text-emerald-400" />
             <input
               type="text"
-              placeholder="🔍 Tìm tên, ID..."
+              placeholder="Tìm theo ID hoặc tên..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                width: '280px',
-                padding: '9px 16px',
-                borderRadius: '8px',
-                border: '1px solid #cbd5e1',
-                fontSize: '13px',
-                outline: 'none',
-                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)',
-              }}
-              onFocus={(e) => e.currentTarget.style.borderColor = '#3b82f6'}
-              onBlur={(e) => e.currentTarget.style.borderColor = '#cbd5e1'}
+              className="h-10 w-full rounded-xl border border-white/10 bg-black/40 pl-10 pr-4 text-sm text-white placeholder:text-zinc-600 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition-all"
             />
           </div>
-        </header>
+        </div>
+      </div>
 
-        {loading ? (
-          <div style={{ padding: '80px', textAlign: 'center', color: '#64748b' }}>
-            <div style={{ width: '40px', height: '40px', border: '3px solid #e2e8f0', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }}></div>
-            Đang tải dữ liệu...
-          </div>
-        ) : filteredItems.length === 0 ? (
-          <div style={{ padding: '80px', textAlign: 'center', color: '#64748b' }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.5 }}>📭</div>
-            <h3 style={{ margin: '0 0 8px', color: '#0f172a' }}>Không có dữ liệu</h3>
-            <p style={{ margin: 0 }}>Không tìm thấy trang phục nào phù hợp với bộ lọc hiện tại.</p>
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ background: '#fff', borderBottom: '2px solid #e2e8f0' }}>
-                  <th style={{ padding: '16px 24px', width: '40px' }}>
+      {/* Main Data Grid */}
+      <div className="rounded-2xl border border-white/10 bg-zinc-950/50 backdrop-blur-xl overflow-hidden shadow-2xl">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm whitespace-nowrap">
+            <thead className="bg-white/5 text-zinc-400">
+              <tr>
+                <th className="px-6 py-4 w-12">
+                  <div className="flex items-center">
                     <input
                       type="checkbox"
                       checked={selectedIds.length > 0 && selectedIds.length === filteredItems.length}
                       onChange={toggleSelectAll}
-                      style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#3b82f6' }}
+                      className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-emerald-500/30 transition-all"
                     />
-                  </th>
-                  <th style={{ padding: '16px', color: '#64748b', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>ID</th>
-                  <th style={{ padding: '16px', color: '#64748b', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tên & Chi tiết</th>
-                  <th style={{ padding: '16px', color: '#64748b', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Giá Ruby</th>
-                  <th style={{ padding: '16px', color: '#64748b', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Trạng thái</th>
-                  <th style={{ padding: '16px 24px', color: '#64748b', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'right' }}>Thao tác</th>
+                  </div>
+                </th>
+                <th className="px-6 py-4 font-semibold w-24">ID</th>
+                <th className="px-6 py-4 font-semibold w-24">Icon</th>
+                <th className="px-6 py-4 font-semibold">Tên cải trang</th>
+                <th className="px-6 py-4 font-semibold w-32 text-right">Giá bán</th>
+                <th className="px-6 py-4 font-semibold w-32 text-center">Trạng thái</th>
+                <th className="px-6 py-4 font-semibold w-24 text-right">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {filteredItems.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center text-zinc-500">
+                    Không tìm thấy cải trang nào phù hợp.
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {filteredItems.map((item) => (
-                  <tr
-                    key={item.id}
-                    style={{
-                      borderBottom: '1px solid #f1f5f9',
-                      background: selectedIds.includes(item.id) ? '#f8fafc' : '#fff',
-                      transition: 'background 0.2s ease',
-                    }}
-                    onMouseOver={(e) => { if (!selectedIds.includes(item.id)) e.currentTarget.style.background = '#f8fafc' }}
-                    onMouseOut={(e) => { if (!selectedIds.includes(item.id)) e.currentTarget.style.background = '#fff' }}
-                  >
-                    <td style={{ padding: '20px 24px' }}>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(item.id)}
-                        onChange={() => toggleSelect(item.id)}
-                        style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#3b82f6' }}
-                      />
-                    </td>
-                    <td style={{ padding: '20px 16px', fontSize: '13px', color: '#64748b', fontFamily: 'ui-monospace, monospace' }}>#{item.id}</td>
-                    <td style={{ padding: '20px 16px' }}>
-                      <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '15px', marginBottom: '6px' }}>
-                        {item.name}
-                      </div>
-                      <div style={{ fontSize: '13px', color: '#64748b', whiteSpace: 'pre-line', maxWidth: '450px', lineHeight: '1.5' }}>
-                        {item.info}
-                      </div>
-                    </td>
-                    <td style={{ padding: '20px 16px' }}>
-                      <strong style={{ fontSize: '15px', color: item.isForSale ? '#e11d48' : '#94a3b8' }}>
-                        {item.isForSale ? `${item.price.toLocaleString('vi-VN')} Ruby` : '---'}
-                      </strong>
-                    </td>
-                    <td style={{ padding: '20px 16px' }}>
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '6px 10px',
-                          background: item.isForSale ? '#f0fdf4' : '#f1f5f9',
-                          color: item.isForSale ? '#15803d' : '#64748b',
-                          border: `1px solid ${item.isForSale ? '#bbf7d0' : '#e2e8f0'}`,
-                          borderRadius: '20px',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                        }}
-                      >
-                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: item.isForSale ? '#22c55e' : '#94a3b8' }}></span>
-                        {item.isForSale ? 'ĐANG BÁN' : 'ĐANG KHÓA'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '20px 24px', textAlign: 'right' }}>
-                      <button
-                        type="button"
-                        style={{
-                          padding: '8px 16px',
-                          background: '#fff',
-                          color: item.isForSale ? '#ef4444' : '#10b981',
-                          border: `1px solid ${item.isForSale ? '#fca5a5' : '#a7f3d0'}`,
-                          borderRadius: '8px',
-                          fontSize: '13px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          transition: 'all 0.2s',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                        }}
-                        disabled={actionLoading !== null}
-                        onClick={() => void handleToggleSingle(item)}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = item.isForSale ? '#fef2f2' : '#ecfdf5';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = '#fff';
-                        }}
-                      >
-                        {actionLoading === `item-${item.id}` ? 'Đang xử lý...' : item.isForSale ? 'Khóa bán' : 'Mở bán ngay'}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+              ) : (
+                filteredItems.map((item) => {
+                  const isSelected = selectedIds.includes(item.id);
+                  const isForSale = item.price >= 0;
+                  return (
+                    <tr 
+                      key={item.id} 
+                      className={`group transition-colors hover:bg-white/[0.02] ${isSelected ? 'bg-emerald-500/[0.02]' : ''}`}
+                    >
+                      <td className="px-6 py-4">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelect(item.id)}
+                          className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-emerald-500/30 transition-all"
+                        />
+                      </td>
+                      <td className="px-6 py-4 font-mono text-zinc-400">{item.id}</td>
+                      <td className="px-6 py-4">
+                        <div className="h-8 w-8 rounded bg-white/5 flex items-center justify-center text-xs text-zinc-500 border border-white/10">
+                          {item.icon}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="font-medium text-zinc-200">{item.name}</div>
+                        <div className="text-xs text-zinc-500 truncate max-w-xs" title={item.info}>
+                          {item.info || 'Không có mô tả'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        {isForSale ? (
+                          <span className="font-mono text-emerald-400">
+                            {item.price.toLocaleString('vi-VN')}
+                          </span>
+                        ) : (
+                          <span className="text-zinc-600">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border ${
+                          isForSale 
+                            ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400' 
+                            : 'border-zinc-500/20 bg-zinc-500/10 text-zinc-400'
+                        }`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${isForSale ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
+                          {isForSale ? 'Mở bán' : 'Khóa'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button
+                          onClick={() => openEditModal(item)}
+                          className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-400 hover:bg-white/10 hover:text-white transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                          Sửa
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Sticky Bulk Action Bar */}
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom-8 fade-in duration-300">
+          <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-zinc-900/90 px-6 py-4 shadow-2xl backdrop-blur-xl">
+            <div className="flex items-center gap-3 pr-4 border-r border-white/10">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 font-bold">
+                {selectedIds.length}
+              </div>
+              <span className="text-sm font-medium text-zinc-200">đã chọn</span>
+            </div>
+            
+            <button
+              onClick={() => setShowSaveGroupModal(true)}
+              className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-indigo-400 hover:bg-indigo-500/10 transition-colors"
+            >
+              <BookmarkPlus className="h-4 w-4" />
+              Lưu thành nhóm
+            </button>
+            
+            <button
+              onClick={() => setShowBulkModal(true)}
+              className="flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 transition-all hover:-translate-y-0.5"
+            >
+              <Tag className="h-4 w-4" />
+              Đăng bán sự kiện
+            </button>
+            
+            <button
+              onClick={() => setSelectedIds([])}
+              className="ml-2 rounded-full p-2 text-zinc-400 hover:bg-white/10 hover:text-white transition-colors"
+            >
+              <XCircle className="h-5 w-5" />
+            </button>
           </div>
-        )}
-      </section>
+        </div>
+      )}
 
-      {/* Bulk Price Setup Modal */}
+      {/* Bulk Update Modal */}
       {showBulkModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(4px)',
-            display: 'grid',
-            placeItems: 'center',
-            zIndex: 100,
-          }}
-        >
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: '16px',
-              padding: '28px',
-              width: 'min(420px, 90vw)',
-              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
-            }}
-          >
-            <h3 style={{ margin: '0 0 8px', fontSize: '18px', color: '#0f172a' }}>Mở bán hàng loạt</h3>
-            <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#64748b' }}>
-              Bạn đang thiết lập giá cho <strong>{selectedIds.length}</strong> bộ cải trang đã chọn.
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
+            <h3 className="text-xl font-bold text-white mb-2">Đăng bán hàng loạt</h3>
+            <p className="text-sm text-zinc-400 mb-6">
+              Bạn đang chọn <strong className="text-emerald-400">{selectedIds.length}</strong> cải trang để cập nhật giá.
+              Đặt giá <strong>-1</strong> để khóa.
             </p>
-
-            <label style={{ display: 'block', marginBottom: '20px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#334155', display: 'block', marginBottom: '8px' }}>
-                Giá Ruby chung cho tất cả:
-              </span>
-              <input
-                type="number"
-                value={bulkPriceInput}
-                onChange={(e) => setBulkPriceInput(parseInt(e.target.value, 10) || 0)}
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '15px',
-                  fontWeight: 600,
-                  color: '#e11d48',
-                }}
-              />
-            </label>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            
+            <div className="space-y-2 mb-8">
+              <label className="text-sm font-medium text-zinc-300">Giá bán mới</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  value={bulkPriceInput}
+                  onChange={(e) => setBulkPriceInput(parseInt(e.target.value) || 0)}
+                  className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-white placeholder:text-zinc-600 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition-all"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-zinc-500">Đơn vị</span>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-3">
               <button
-                type="button"
                 onClick={() => setShowBulkModal(false)}
-                style={{
-                  padding: '10px 16px',
-                  background: '#f1f5f9',
-                  color: '#475569',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontWeight: 600,
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                }}
+                className="rounded-xl px-4 py-2 text-sm font-medium text-zinc-400 hover:bg-white/5 transition-colors"
               >
                 Hủy
               </button>
               <button
-                type="button"
-                onClick={() => void handleBulkUpdate(bulkPriceInput)}
-                disabled={actionLoading !== null}
-                style={{
-                  padding: '10px 16px',
-                  background: '#1e293b',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontWeight: 700,
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                }}
+                onClick={handleBulkUpdatePrice}
+                disabled={actionLoading === 'bulk_update'}
+                className="flex items-center gap-2 rounded-xl bg-emerald-500 px-6 py-2 text-sm font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 transition-colors disabled:opacity-50"
               >
-                {actionLoading !== null ? 'Đang lưu…' : 'Mở bán ngay'}
+                {actionLoading === 'bulk_update' && <Loader2 className="h-4 w-4 animate-spin" />}
+                Xác nhận đăng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save Group Modal */}
+      {showSaveGroupModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
+            <h3 className="text-xl font-bold text-white mb-2">Lưu nhóm sự kiện</h3>
+            <p className="text-sm text-zinc-400 mb-6">
+              Lưu <strong className="text-indigo-400">{selectedIds.length}</strong> cải trang vào bộ nhớ tạm để tái sử dụng sau này.
+            </p>
+            
+            <div className="space-y-2 mb-8">
+              <label className="text-sm font-medium text-zinc-300">Tên nhóm</label>
+              <input
+                type="text"
+                placeholder="VD: Sự kiện Halloween 2026..."
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-white focus:border-indigo-500/50 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all"
+              />
+            </div>
+            
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowSaveGroupModal(false)}
+                className="rounded-xl px-4 py-2 text-sm font-medium text-zinc-400 hover:bg-white/5 transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleSaveGroup}
+                disabled={!newGroupName.trim()}
+                className="flex items-center gap-2 rounded-xl bg-indigo-500 px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-400 transition-colors disabled:opacity-50"
+              >
+                <Save className="h-4 w-4" />
+                Lưu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Load Group Modal */}
+      {showLoadGroupModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-white">Nhóm sự kiện đã lưu</h3>
+              <button onClick={() => setShowLoadGroupModal(false)} className="text-zinc-500 hover:text-white">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="overflow-y-auto pr-2 space-y-3 flex-1">
+              {savedGroups.length === 0 ? (
+                <div className="text-center py-8 text-zinc-500">
+                  <BookmarkPlus className="h-8 w-8 mx-auto mb-3 opacity-50" />
+                  Chưa có nhóm nào được lưu.
+                </div>
+              ) : (
+                savedGroups.map((g, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-4 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-colors">
+                    <div>
+                      <h4 className="font-medium text-white">{g.name}</h4>
+                      <p className="text-xs text-zinc-500">{g.ids.length} cải trang</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => handleDeleteGroup(idx)}
+                        className="p-2 rounded-lg text-rose-400 hover:bg-rose-400/10 transition-colors"
+                        title="Xóa nhóm"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                      <button 
+                        onClick={() => handleLoadGroup(g.ids)}
+                        className="px-4 py-2 rounded-lg bg-indigo-500/20 text-indigo-400 font-medium hover:bg-indigo-500/30 transition-colors text-sm"
+                      >
+                        Tải
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full Edit Modal */}
+      {showEditModal && editItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in p-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-zinc-950 p-6 md:p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-2xl font-bold text-white mb-6">Chỉnh sửa #{editItem.id}</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-300">Tên cải trang</label>
+                <input
+                  type="text"
+                  value={editForm.name || ''}
+                  onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+                  className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-2.5 text-white focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-300">Icon ID</label>
+                <input
+                  type="number"
+                  value={editForm.icon || 0}
+                  onChange={(e) => setEditForm({...editForm, icon: parseInt(e.target.value) || 0})}
+                  className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-2.5 text-white focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition-all font-mono"
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-medium text-zinc-300">Mô tả (Info)</label>
+                <textarea
+                  value={editForm.info || ''}
+                  onChange={(e) => setEditForm({...editForm, info: e.target.value})}
+                  className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-white focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition-all resize-y min-h-[80px]"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-300">Mwear</label>
+                <input
+                  type="text"
+                  value={editForm.mwear || ''}
+                  onChange={(e) => setEditForm({...editForm, mwear: e.target.value})}
+                  className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-2.5 text-zinc-300 font-mono text-sm focus:border-emerald-500/50 focus:outline-none transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-300">OP (Options)</label>
+                <input
+                  type="text"
+                  value={editForm.op || ''}
+                  onChange={(e) => setEditForm({...editForm, op: e.target.value})}
+                  className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-2.5 text-zinc-300 font-mono text-sm focus:border-emerald-500/50 focus:outline-none transition-all"
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2 pt-4 border-t border-white/5">
+                <label className="text-sm font-medium text-emerald-400">Giá bán (Nhập -1 để khóa)</label>
+                <input
+                  type="number"
+                  value={editForm.price ?? -1}
+                  onChange={(e) => setEditForm({...editForm, price: parseInt(e.target.value)})}
+                  className="w-full rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-emerald-300 focus:border-emerald-500 focus:outline-none transition-all font-mono text-lg"
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="rounded-xl px-5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-white/5 transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleFullUpdate}
+                disabled={actionLoading === 'full_update'}
+                className="flex items-center gap-2 rounded-xl bg-emerald-500 px-6 py-2.5 text-sm font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 transition-colors disabled:opacity-50"
+              >
+                {actionLoading === 'full_update' && <Loader2 className="h-4 w-4 animate-spin" />}
+                Lưu thay đổi
               </button>
             </div>
           </div>
