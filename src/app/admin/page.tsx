@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { AdminWorkspace } from '@/features/admin/components/AdminWorkspace';
+import { AdminDashboard } from '@/features/admin/components/AdminDashboard';
 
 export const metadata: Metadata = {
   title: 'Đài chỉ huy - Hải Tặc Tí Hon',
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function AdminPage() {
-  return <AdminWorkspace />;
+  return <AdminDashboard />;
 }
