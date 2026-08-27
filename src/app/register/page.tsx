@@ -9,11 +9,13 @@ export const metadata: Metadata = {
 
 export default function RegisterPage() {
   return (
-    <AuthCard
-      title="Đăng ký tài khoản"
-      subtitle="Tạo tài khoản mới để tham gia hành trình"
-    >
-      <RegisterForm />
-    </AuthCard>
+    <main className="app-container">
+      <AuthCard
+        title="Đăng ký tài khoản"
+        subtitle="Tạo tài khoản mới để tham gia hành trình"
+      >
+        <RegisterForm />
+      </AuthCard>
+    </main>
   );
 }

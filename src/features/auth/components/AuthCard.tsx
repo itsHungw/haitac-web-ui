@@ -1,38 +1,21 @@
-import React from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { Card } from '@/components/ui/Card';
 
-export interface AuthCardProps {
-  title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-}
+export interface AuthCardProps { title: string; subtitle?: string; children: ReactNode }
 
 export function AuthCard({ title, subtitle, children }: AuthCardProps) {
   return (
-    <Card>
-      <div className="text-center" style={{ marginBottom: '20px' }}>
-        <Link href="/" style={{ textDecoration: 'none', display: 'inline-block' }}>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '48px',
-              height: '48px',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(6, 182, 212, 0.2))',
-              border: '1px solid rgba(245, 158, 11, 0.4)',
-              fontSize: '24px',
-              marginBottom: '12px',
-              boxShadow: 'var(--shadow-glow)',
-            }}
-          >
-            🏴‍☠️
-          </div>
+    <Card className="auth-card">
+      <div className="auth-card__heading">
+        <Link href="/" className="auth-card__brand" aria-label="Về trang chủ">
+          <Image src="/images/logo.png" alt="Hải Tặc Tí Hon" width={56} height={56} className="pixelated" />
+          <span className="auth-card__brand-title">HẢI TẶC<br />TÍ HON</span>
         </Link>
-        <h1 className="title-main">{title}</h1>
-        {subtitle && <p className="subtitle">{subtitle}</p>}
+        <span className="eyebrow eyebrow--dark">CỔNG THUYỀN TRƯỞNG</span>
+        <h1>{title}</h1>
+        {subtitle && <p>{subtitle}</p>}
       </div>
       {children}
     </Card>

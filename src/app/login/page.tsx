@@ -9,11 +9,13 @@ export const metadata: Metadata = {
 
 export default function LoginPage() {
   return (
-    <AuthCard
-      title="Đăng nhập"
-      subtitle="Nhập thông tin tài khoản để tiếp tục"
-    >
-      <LoginForm />
-    </AuthCard>
+    <main className="app-container">
+      <AuthCard
+        title="Đăng nhập"
+        subtitle="Nhập thông tin tài khoản để tiếp tục"
+      >
+        <LoginForm />
+      </AuthCard>
+    </main>
   );
 }

@@ -12,9 +12,10 @@ import type { LoginResponse } from '../types/auth.types';
 
 export interface LoginFormProps {
   onSuccess?: (data: LoginResponse) => void;
+  onRegisterClick?: () => void;
 }
 
-export function LoginForm({ onSuccess }: LoginFormProps) {
+export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
   const router = useRouter();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -50,12 +51,14 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
       <Alert variant="error">{errorMessage}</Alert>
 
       <Input
-        label="Tên tài khoản"
+        label="Tên tài khoản hoặc Email"
         type="text"
         value={username}
-        onChange={(e) => setUsername(e.target.value)}
-        placeholder="Nhập tên tài khoản"
+        onChange={(e) => setUsername(e.target.value.toLowerCase())}
+        placeholder="Nhập tài khoản hoặc email"
         autoComplete="username"
+        inputMode="email"
+        maxLength={60}
         required
         disabled={isSubmitting}
       />
@@ -67,6 +70,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         onChange={(e) => setPassword(e.target.value)}
         placeholder="Nhập mật khẩu"
         autoComplete="current-password"
+        maxLength={60}
         required
         disabled={isSubmitting}
       />
@@ -85,9 +89,11 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
       <div className="text-center mt-4">
         <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
           Chưa có tài khoản?{' '}
-          <Link href="/register" style={{ fontWeight: 600 }}>
-            Đăng ký ngay
-          </Link>
+          {onRegisterClick ? (
+            <button type="button" className="inline-link" onClick={onRegisterClick}>Đăng ký ngay</button>
+          ) : (
+            <Link href="/register" style={{ fontWeight: 600 }}>Đăng ký ngay</Link>
+          )}
         </p>
       </div>
     </form>

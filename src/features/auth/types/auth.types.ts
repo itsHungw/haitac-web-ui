@@ -11,6 +11,7 @@ export interface LoginRequest {
 export interface RegisterRequest {
   user: string;
   pass: string;
+  turnstileToken: string;
 }
 
 export interface LoginResponse {
