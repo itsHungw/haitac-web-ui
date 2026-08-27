@@ -13,7 +13,6 @@ import type {
   AdminPlayerStatus,
   UpdatePlayerLockRequest,
   AdminFashionItem,
-  ToggleFashionEventPayload,
   UpdatePlayerBalancePayload,
 } from '../types/admin.types';
 
@@ -92,8 +91,8 @@ export const adminService = {
     return apiClient.put<AdminFashionItem>(`admin/fashion/${id}`, { price });
   },
 
-  toggleFashionEvent(payload: ToggleFashionEventPayload): Promise<{ affectedCount: number }> {
-    return apiClient.post<{ affectedCount: number }>('admin/fashion/toggle-event', payload);
+  bulkUpdateFashionPrice(payload: { itemIds: number[]; price: number }): Promise<{ affectedCount: number }> {
+    return apiClient.post<{ affectedCount: number }>('admin/fashion/bulk-update', payload);
   },
 
   getAudit(query = '', page = 0, size = 20): Promise<AdminAuditPage> {

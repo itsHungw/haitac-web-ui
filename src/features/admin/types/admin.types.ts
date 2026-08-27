@@ -155,15 +155,9 @@ export interface AdminFashionItem {
   mwear: string;
   op: string;
   price: number;
-  eventTag: 'TET' | 'NOEL' | 'HALLOWEEN' | 'GERMA66' | 'HERO_EVENT' | 'ANIME_SPECIAL' | 'DEFAULT' | string;
   isForSale: boolean;
 }
 
-export interface ToggleFashionEventPayload {
-  eventTag: string;
-  active: boolean;
-  defaultPrice: number;
-}
 
 export interface UpdatePlayerBalancePayload {
   coin?: number;
