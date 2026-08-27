@@ -1,614 +1,849 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { extractErrorMessage } from '@/lib/api/errors';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { ApiError, extractErrorMessage } from '@/lib/api/errors';
 import { adminService } from '../services/admin.service';
 import type { AdminFashionItem } from '../types/admin.types';
-import { Search, Loader2, Edit2, ShieldAlert, CheckCircle2, XCircle, Tag, BookmarkPlus, FolderOpen, Save, Trash2, X, PlusCircle } from 'lucide-react';
 
-const STATUS_TABS = [
-  { key: 'ALL', label: 'Tất cả' },
-  { key: 'FOR_SALE', label: 'Đang mở bán' },
-  { key: 'LOCKED', label: 'Đang khóa' },
-];
+const numberFormatter = new Intl.NumberFormat('vi-VN');
+
+interface SavedGroup {
+  name: string;
+  ids: number[];
+  createdAt: string;
+}
 
 export function FashionManagement() {
+  const router = useRouter();
   const [items, setItems] = useState<AdminFashionItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('ALL');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
+  // Filter & Search
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'for_sale' | 'locked'>('all');
+
+  // Selected for Bulk Action
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [bulkPriceInput, setBulkPriceInput] = useState<number>(5000);
-  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [showBulkPriceModal, setShowBulkPriceModal] = useState(false);
+  const [bulkPrice, setBulkPrice] = useState<string>('5000');
+  const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
 
-  // Full Edit Modal State
-  const [editItem, setEditItem] = useState<AdminFashionItem | null>(null);
-  const [editForm, setEditForm] = useState<Partial<AdminFashionItem>>({});
-  const [showEditModal, setShowEditModal] = useState(false);
+  // Edit Drawer
+  const [editingItem, setEditingItem] = useState<AdminFashionItem | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    icon: '0',
+    info: '',
+    mwear: '',
+    op: '',
+    price: '-1',
+  });
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
-  // Local Groups State (Drafts)
-  const [savedGroups, setSavedGroups] = useState<{name: string, ids: number[]}[]>([]);
-  const [showSaveGroupModal, setShowSaveGroupModal] = useState(false);
+  // Local Event Groups
+  const [savedGroups, setSavedGroups] = useState<SavedGroup[]>([]);
+  const [showGroupModal, setShowGroupModal] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
-  const [showLoadGroupModal, setShowLoadGroupModal] = useState(false);
 
+  // Load saved event groups from localStorage
   useEffect(() => {
-    // Load local groups
-    const groups = localStorage.getItem('htth_admin_fashion_groups');
-    if (groups) {
-      try {
-        setSavedGroups(JSON.parse(groups));
-      } catch (e) {
-        // ignore
+    try {
+      const stored = localStorage.getItem('htth_admin_fashion_groups');
+      if (stored) {
+        setSavedGroups(JSON.parse(stored));
       }
+    } catch {
+      // ignore
     }
   }, []);
 
-  const saveLocalGroups = (groups: {name: string, ids: number[]}[]) => {
+  const saveGroupsToStorage = (groups: SavedGroup[]) => {
     setSavedGroups(groups);
-    localStorage.setItem('htth_admin_fashion_groups', JSON.stringify(groups));
+    try {
+      localStorage.setItem('htth_admin_fashion_groups', JSON.stringify(groups));
+    } catch {
+      // ignore
+    }
   };
 
-  async function loadData() {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await adminService.getFashionItems();
-      setItems(data);
-      setSelectedIds([]);
-    } catch (err) {
-      setError(extractErrorMessage(err, 'Không thể tải danh sách cải trang.'));
-    } finally {
-      setLoading(false);
+  const handleAuthError = useCallback((caught: unknown) => {
+    if (caught instanceof ApiError && caught.status === 401) {
+      router.replace('/login');
+      return true;
     }
-  }
+    return false;
+  }, [router]);
 
+  // Load Fashion Items from API
   useEffect(() => {
-    void loadData();
+    let active = true;
+    setIsLoading(true);
+    setError(null);
+    adminService.getFashionItems()
+      .then((data) => {
+        if (active) {
+          setItems(data);
+          setSelectedIds([]);
+        }
+      })
+      .catch((caught) => {
+        if (!active || handleAuthError(caught)) return;
+        setError(extractErrorMessage(caught, 'Không thể tải danh sách cải trang.'));
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => { active = false; };
+  }, [handleAuthError, reloadKey]);
+
+  // Keyboard escape handler for drawers & modals
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setEditingItem(null);
+        setShowBulkPriceModal(false);
+        setShowGroupModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Compute stats
   const stats = useMemo(() => {
     const total = items.length;
     const forSale = items.filter((i) => i.price >= 0).length;
     const locked = total - forSale;
-    return { total, forSale, locked };
-  }, [items]);
+    return { total, forSale, locked, groupsCount: savedGroups.length };
+  }, [items, savedGroups]);
 
+  // Filter items
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
       const isForSale = item.price >= 0;
-      if (activeTab === 'FOR_SALE' && !isForSale) return false;
-      if (activeTab === 'LOCKED' && isForSale) return false;
+      if (statusFilter === 'for_sale' && !isForSale) return false;
+      if (statusFilter === 'locked' && isForSale) return false;
 
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        return (
-          item.name.toLowerCase().includes(query) ||
-          item.id.toString().includes(query)
-        );
+      if (query.trim()) {
+        const q = query.trim().toLowerCase();
+        const matchId = String(item.id).includes(q);
+        const matchName = item.name.toLowerCase().includes(q);
+        const matchInfo = item.info ? item.info.toLowerCase().includes(q) : false;
+        return matchId || matchName || matchInfo;
       }
       return true;
     });
-  }, [items, activeTab, searchQuery]);
+  }, [items, query, statusFilter]);
 
-  const toggleSelectAll = () => {
-    if (selectedIds.length === filteredItems.length) {
+  // Selection handlers
+  const handleToggleAll = () => {
+    if (selectedIds.length === filteredItems.length && filteredItems.length > 0) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(filteredItems.map(i => i.id));
+      setSelectedIds(filteredItems.map((i) => i.id));
     }
   };
 
-  const toggleSelect = (id: number) => {
-    if (selectedIds.includes(id)) {
-      setSelectedIds(selectedIds.filter(i => i !== id));
-    } else {
-      setSelectedIds([...selectedIds, id]);
-    }
-  };
-
-  const showNotification = (msg: string, isError = false) => {
-    if (isError) setError(msg);
-    else setSuccess(msg);
-    setTimeout(() => {
-      setError(null);
-      setSuccess(null);
-    }, 4000);
-  };
-
-  const handleBulkUpdatePrice = async () => {
-    if (selectedIds.length === 0) return;
-    try {
-      setActionLoading('bulk_update');
-      await adminService.bulkUpdateFashionPrice({
-        itemIds: selectedIds,
-        price: bulkPriceInput
-      });
-      showNotification(`Cập nhật thành công ${selectedIds.length} cải trang!`);
-      setShowBulkModal(false);
-      setSelectedIds([]);
-      await loadData();
-    } catch (err) {
-      showNotification(extractErrorMessage(err, 'Lỗi cập nhật giá.'), true);
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const openEditModal = (item: AdminFashionItem) => {
-    setEditItem(item);
-    setEditForm({ ...item });
-    setShowEditModal(true);
-  };
-
-  const handleFullUpdate = async () => {
-    if (!editItem) return;
-    try {
-      setActionLoading('full_update');
-      await adminService.updateFashion(editItem.id, editForm);
-      showNotification(`Đã lưu thay đổi cho cải trang #${editItem.id}`);
-      setShowEditModal(false);
-      await loadData();
-    } catch (err) {
-      showNotification(extractErrorMessage(err, 'Lỗi cập nhật cải trang.'), true);
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleSaveGroup = () => {
-    if (!newGroupName.trim() || selectedIds.length === 0) return;
-    const newGroups = [...savedGroups, { name: newGroupName.trim(), ids: selectedIds }];
-    saveLocalGroups(newGroups);
-    setNewGroupName('');
-    setShowSaveGroupModal(false);
-    showNotification(`Đã lưu nhóm sự kiện: ${newGroupName}`);
-  };
-
-  const handleDeleteGroup = (idx: number) => {
-    const newGroups = [...savedGroups];
-    newGroups.splice(idx, 1);
-    saveLocalGroups(newGroups);
-  };
-
-  const handleLoadGroup = (ids: number[]) => {
-    setSelectedIds(ids);
-    setShowLoadGroupModal(false);
-    showNotification(`Đã chọn ${ids.length} cải trang từ nhóm.`);
-  };
-
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-10 w-10 animate-spin text-emerald-500" />
-      </div>
+  const handleToggleItem = (id: number) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
-  }
+  };
+
+  // Open Edit Drawer
+  const handleOpenEdit = (item: AdminFashionItem) => {
+    setEditingItem(item);
+    setEditError(null);
+    setEditForm({
+      name: item.name,
+      icon: String(item.icon),
+      info: item.info || '',
+      mwear: item.mwear || '',
+      op: item.op || '',
+      price: String(item.price),
+    });
+  };
+
+  // Submit Edit Form
+  const handleSubmitEdit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!editingItem) return;
+    setEditError(null);
+    setIsSavingEdit(true);
+    try {
+      const parsedPrice = parseInt(editForm.price, 10);
+      const parsedIcon = parseInt(editForm.icon, 10);
+      if (isNaN(parsedPrice) || parsedPrice < -1) {
+        throw new Error('Giá bán không hợp lệ (-1: khóa bán, >= 0: giá bán).');
+      }
+      if (isNaN(parsedIcon) || parsedIcon < 0) {
+        throw new Error('Icon ID không hợp lệ.');
+      }
+      if (!editForm.name.trim()) {
+        throw new Error('Tên cải trang không được để trống.');
+      }
+
+      await adminService.updateFashion(editingItem.id, {
+        name: editForm.name.trim(),
+        icon: parsedIcon,
+        info: editForm.info.trim(),
+        mwear: editForm.mwear.trim(),
+        op: editForm.op.trim(),
+        price: parsedPrice,
+      });
+
+      setSuccessMessage(`Đã cập nhật thông tin cải trang #${editingItem.id} (${editForm.name.trim()}).`);
+      setEditingItem(null);
+      setReloadKey((k) => k + 1);
+    } catch (caught) {
+      setEditError(extractErrorMessage(caught, caught instanceof Error ? caught.message : 'Không thể lưu cải trang.'));
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  // Submit Bulk Update Price
+  const handleSubmitBulkPrice = async (e: FormEvent) => {
+    e.preventDefault();
+    if (selectedIds.length === 0) return;
+    setIsBulkSubmitting(true);
+    try {
+      const parsedPrice = parseInt(bulkPrice, 10);
+      if (isNaN(parsedPrice) || parsedPrice < -1) {
+        throw new Error('Giá bán không hợp lệ (-1: khóa bán, >= 0: giá bán).');
+      }
+
+      const res = await adminService.bulkUpdateFashionPrice({
+        itemIds: selectedIds,
+        price: parsedPrice,
+      });
+
+      setSuccessMessage(`Đã cập nhật giá bán thành công cho ${res.affectedCount} cải trang.`);
+      setShowBulkPriceModal(false);
+      setSelectedIds([]);
+      setReloadKey((k) => k + 1);
+    } catch (caught) {
+      setError(extractErrorMessage(caught, caught instanceof Error ? caught.message : 'Không thể cập nhật hàng loạt.'));
+    } finally {
+      setIsBulkSubmitting(false);
+    }
+  };
+
+  // Save new event group
+  const handleSaveGroup = (e: FormEvent) => {
+    e.preventDefault();
+    if (!newGroupName.trim() || selectedIds.length === 0) return;
+    const nextGroups: SavedGroup[] = [
+      {
+        name: newGroupName.trim(),
+        ids: [...selectedIds],
+        createdAt: new Date().toISOString(),
+      },
+      ...savedGroups,
+    ];
+    saveGroupsToStorage(nextGroups);
+    setNewGroupName('');
+    setSuccessMessage(`Đã lưu nhóm "${newGroupName.trim()}" (${selectedIds.length} cải trang).`);
+  };
+
+  // Apply a saved group to selection
+  const handleApplyGroup = (group: SavedGroup) => {
+    setSelectedIds(group.ids);
+    setShowGroupModal(false);
+    setSuccessMessage(`Đã chọn ${group.ids.length} cải trang từ nhóm "${group.name}".`);
+  };
+
+  // Delete a saved group
+  const handleDeleteGroup = (index: number) => {
+    const nextGroups = savedGroups.filter((_, i) => i !== index);
+    saveGroupsToStorage(nextGroups);
+  };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-24">
-      {/* Header & Stats */}
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+    <div className="admin-page admin-fashion-page">
+      {/* 1. Heading */}
+      <section className="admin-page-heading">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Cải trang</h1>
-          <p className="text-zinc-400">Quản lý kho cải trang, thiết lập giá bán và phát hành sự kiện.</p>
+          <span>LIVE OPS / SỰ KIỆN & VẬT PHẨM</span>
+          <h1>Quản lý Cải trang</h1>
+          <p>Thiết lập giá bán, điều chỉnh thông số và gom nhóm phát hành theo sự kiện.</p>
         </div>
-        
-        <div className="flex gap-4">
-          <div className="rounded-xl border border-white/10 bg-black/40 px-6 py-4 backdrop-blur-md">
-            <p className="text-sm font-medium text-zinc-400">Đang mở bán</p>
-            <p className="text-2xl font-bold text-emerald-400">{stats.forSale}</p>
-          </div>
-          <div className="rounded-xl border border-white/10 bg-black/40 px-6 py-4 backdrop-blur-md">
-            <p className="text-sm font-medium text-zinc-400">Đang khóa</p>
-            <p className="text-2xl font-bold text-rose-400">{stats.locked}</p>
-          </div>
-          <div className="rounded-xl border border-white/10 bg-black/40 px-6 py-4 backdrop-blur-md">
-            <p className="text-sm font-medium text-zinc-400">Tổng cộng</p>
-            <p className="text-2xl font-bold text-zinc-100">{stats.total}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Notifications */}
-      {error && (
-        <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-4 text-rose-400 flex items-center gap-3">
-          <ShieldAlert className="h-5 w-5" />
-          {error}
-        </div>
-      )}
-      {success && (
-        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-emerald-400 flex items-center gap-3">
-          <CheckCircle2 className="h-5 w-5" />
-          {success}
-        </div>
-      )}
-
-      {/* Controls: Search, Tabs, Group Actions */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-black/20 p-2 rounded-2xl border border-white/5">
-        <div className="flex rounded-xl bg-black/40 p-1">
-          {STATUS_TABS.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
-                activeTab === tab.key
-                  ? 'bg-zinc-800 text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex gap-2 w-full sm:w-auto">
-          <button 
-            onClick={() => setShowLoadGroupModal(true)}
-            className="flex items-center gap-2 rounded-xl bg-indigo-500/10 px-4 py-2 text-sm font-medium text-indigo-400 transition-colors hover:bg-indigo-500/20"
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            type="button"
+            className="admin-secondary-button"
+            onClick={() => setShowGroupModal(true)}
           >
-            <FolderOpen className="h-4 w-4" />
-            Tải nhóm ({savedGroups.length})
+            Nhóm sự kiện ({savedGroups.length})
           </button>
-          
-          <div className="relative group w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500 transition-colors group-focus-within:text-emerald-400" />
-            <input
-              type="text"
-              placeholder="Tìm theo ID hoặc tên..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-10 w-full rounded-xl border border-white/10 bg-black/40 pl-10 pr-4 text-sm text-white placeholder:text-zinc-600 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition-all"
-            />
-          </div>
+          <button
+            type="button"
+            className="admin-secondary-button"
+            onClick={() => setReloadKey((k) => k + 1)}
+            disabled={isLoading}
+          >
+            {isLoading ? 'Đang đồng bộ…' : 'Làm mới dữ liệu'}
+          </button>
         </div>
-      </div>
+      </section>
 
-      {/* Main Data Grid */}
-      <div className="rounded-2xl border border-white/10 bg-zinc-950/50 backdrop-blur-xl overflow-hidden shadow-2xl">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm whitespace-nowrap">
-            <thead className="bg-white/5 text-zinc-400">
+      {/* 2. Metric Strip */}
+      <section className="admin-metric-strip" aria-busy={isLoading}>
+        <article className="admin-metric is-green">
+          <span>ĐANG MỞ BÁN</span>
+          <strong>{isLoading ? '—' : numberFormatter.format(stats.forSale)}</strong>
+          <small>Có thể mua trong cửa hàng</small>
+        </article>
+        <article className="admin-metric is-red">
+          <span>ĐANG KHÓA BÁN</span>
+          <strong>{isLoading ? '—' : numberFormatter.format(stats.locked)}</strong>
+          <small>Giá trị -1 (Tạm ngưng)</small>
+        </article>
+        <article className="admin-metric">
+          <span>TỔNG CẢI TRANG</span>
+          <strong>{isLoading ? '—' : numberFormatter.format(stats.total)}</strong>
+          <small>Toàn bộ kho dữ liệu game</small>
+        </article>
+        <article className="admin-metric is-amber">
+          <span>ĐỢT SỰ KIỆN ĐÃ LƯU</span>
+          <strong>{numberFormatter.format(stats.groupsCount)}</strong>
+          <small>Gom nhóm sự kiện cục bộ</small>
+        </article>
+      </section>
+
+      {/* 3. Filter & Search Panel */}
+      <section className="admin-filter-panel" style={{ gridTemplateColumns: 'minmax(280px, 1fr) 220px auto' }}>
+        <div className="admin-user-search">
+          <span aria-hidden="true">⌕</span>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Tìm theo ID, tên cải trang hoặc chỉ số..."
+            aria-label="Tìm cải trang"
+          />
+        </div>
+
+        <label>
+          <span className="sr-only">Lọc theo trạng thái bán</span>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as 'all' | 'for_sale' | 'locked')}
+          >
+            <option value="all">Tất cả trạng thái</option>
+            <option value="for_sale">Đang mở bán (Giá &gt;= 0)</option>
+            <option value="locked">Đang khóa bán (Giá = -1)</option>
+          </select>
+        </label>
+
+        <button
+          type="button"
+          className="admin-secondary-button"
+          onClick={() => setShowGroupModal(true)}
+          style={{ height: '48px' }}
+        >
+          📂 Đợt sự kiện
+        </button>
+      </section>
+
+      {/* Inline Feedback Messages */}
+      {error && (
+        <div className="admin-inline-error" role="alert" style={{ marginTop: '16px' }}>
+          <span>{error}</span>
+          <button type="button" onClick={() => setReloadKey((k) => k + 1)}>Thử lại</button>
+        </div>
+      )}
+      {successMessage && (
+        <div
+          style={{
+            marginTop: '16px',
+            padding: '12px 18px',
+            background: '#e4f6ee',
+            border: '1px solid #b7ecd7',
+            color: '#087455',
+            borderRadius: '8px',
+            fontSize: '11px',
+            fontWeight: '700',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <span>✓ {successMessage}</span>
+          <button
+            type="button"
+            onClick={() => setSuccessMessage(null)}
+            style={{ border: 0, background: 'transparent', color: 'inherit', cursor: 'pointer', fontWeight: 800 }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* 4. Data Panel & Table */}
+      <section className="admin-data-panel">
+        <div className="admin-table-scroll">
+          <table className="admin-user-table">
+            <thead>
               <tr>
-                <th className="px-6 py-4 w-12">
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.length > 0 && selectedIds.length === filteredItems.length}
-                      onChange={toggleSelectAll}
-                      className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-emerald-500/30 transition-all"
-                    />
-                  </div>
+                <th style={{ width: '48px', textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    className="admin-fashion-checkbox"
+                    checked={filteredItems.length > 0 && selectedIds.length === filteredItems.length}
+                    onChange={handleToggleAll}
+                    aria-label="Chọn tất cả"
+                  />
                 </th>
-                <th className="px-6 py-4 font-semibold w-24">ID</th>
-                <th className="px-6 py-4 font-semibold w-24">Icon</th>
-                <th className="px-6 py-4 font-semibold">Tên cải trang</th>
-                <th className="px-6 py-4 font-semibold w-32 text-right">Giá bán</th>
-                <th className="px-6 py-4 font-semibold w-32 text-center">Trạng thái</th>
-                <th className="px-6 py-4 font-semibold w-24 text-right">Thao tác</th>
+                <th style={{ width: '80px' }}>ID</th>
+                <th style={{ width: '80px' }}>Icon</th>
+                <th>Tên &amp; Thuộc tính Cải trang</th>
+                <th style={{ width: '160px', textAlign: 'right' }}>Giá bán</th>
+                <th style={{ width: '140px', textAlign: 'center' }}>Trạng thái</th>
+                <th style={{ width: '100px', textAlign: 'right' }}>Thao tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
-              {filteredItems.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-zinc-500">
-                    Không tìm thấy cải trang nào phù hợp.
-                  </td>
-                </tr>
-              ) : (
+            <tbody>
+              {isLoading ? (
+                Array.from({ length: 6 }).map((_, index) => (
+                  <tr className="admin-table-skeleton" key={index}>
+                    <td colSpan={7}><span /></td>
+                  </tr>
+                ))
+              ) : filteredItems.length > 0 ? (
                 filteredItems.map((item) => {
                   const isSelected = selectedIds.includes(item.id);
                   const isForSale = item.price >= 0;
                   return (
-                    <tr 
-                      key={item.id} 
-                      className={`group transition-colors hover:bg-white/[0.02] ${isSelected ? 'bg-emerald-500/[0.02]' : ''}`}
+                    <tr
+                      key={item.id}
+                      style={{ background: isSelected ? 'rgba(16, 23, 84, 0.03)' : undefined }}
                     >
-                      <td className="px-6 py-4">
+                      <td style={{ textAlign: 'center' }}>
                         <input
                           type="checkbox"
+                          className="admin-fashion-checkbox"
                           checked={isSelected}
-                          onChange={() => toggleSelect(item.id)}
-                          className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-emerald-500/30 transition-all"
+                          onChange={() => handleToggleItem(item.id)}
+                          aria-label={`Chọn #${item.id}`}
                         />
                       </td>
-                      <td className="px-6 py-4 font-mono text-zinc-400">{item.id}</td>
-                      <td className="px-6 py-4">
-                        <div className="h-8 w-8 rounded bg-white/5 flex items-center justify-center text-xs text-zinc-500 border border-white/10">
+                      <td>
+                        <strong style={{ fontFamily: 'var(--font-mono)', color: 'var(--admin-navy)' }}>
+                          #{item.id}
+                        </strong>
+                      </td>
+                      <td>
+                        <div className="admin-fashion-icon-badge">
                           {item.icon}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="font-medium text-zinc-200">{item.name}</div>
-                        <div className="text-xs text-zinc-500 truncate max-w-xs" title={item.info}>
-                          {item.info || 'Không có mô tả'}
+                      <td>
+                        <div className="admin-fashion-item-lead">
+                          <div>
+                            <strong>{item.name}</strong>
+                            <p title={item.info}>{item.info || 'Không có mô tả chi tiết'}</p>
+                          </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td style={{ textAlign: 'right' }}>
                         {isForSale ? (
-                          <span className="font-mono text-emerald-400">
-                            {item.price.toLocaleString('vi-VN')}
+                          <span className="admin-fashion-price is-for-sale">
+                            {numberFormatter.format(item.price)} Beri
                           </span>
                         ) : (
-                          <span className="text-zinc-600">-</span>
+                          <span className="admin-fashion-price is-locked">
+                            —
+                          </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border ${
-                          isForSale 
-                            ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400' 
-                            : 'border-zinc-500/20 bg-zinc-500/10 text-zinc-400'
-                        }`}>
-                          <span className={`h-1.5 w-1.5 rounded-full ${isForSale ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
-                          {isForSale ? 'Mở bán' : 'Khóa'}
+                      <td style={{ textAlign: 'center' }}>
+                        <span className={`admin-state-badge ${isForSale ? 'is-online' : 'is-locked'}`}>
+                          {isForSale ? 'Đang mở bán' : 'Đang khóa'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td style={{ textAlign: 'right' }}>
                         <button
-                          onClick={() => openEditModal(item)}
-                          className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-400 hover:bg-white/10 hover:text-white transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                          type="button"
+                          className="admin-manage-link"
+                          onClick={() => handleOpenEdit(item)}
                         >
-                          <Edit2 className="h-3.5 w-3.5" />
-                          Sửa
+                          Chỉnh sửa
                         </button>
                       </td>
                     </tr>
                   );
                 })
+              ) : (
+                <tr>
+                  <td colSpan={7}>
+                    <div className="admin-table-empty">
+                      Không tìm thấy cải trang nào phù hợp với bộ lọc.
+                    </div>
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
-      </div>
 
-      {/* Sticky Bulk Action Bar */}
+        <footer className="admin-pagination">
+          <span>Hiển thị <strong>{filteredItems.length}</strong> / {items.length} cải trang</span>
+          {selectedIds.length > 0 && (
+            <span>Đã chọn <strong>{selectedIds.length}</strong> mục</span>
+          )}
+        </footer>
+      </section>
+
+      {/* 5. Sticky Floating Bulk Action Bar */}
       {selectedIds.length > 0 && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom-8 fade-in duration-300">
-          <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-zinc-900/90 px-6 py-4 shadow-2xl backdrop-blur-xl">
-            <div className="flex items-center gap-3 pr-4 border-r border-white/10">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 font-bold">
-                {selectedIds.length}
+        <div className="admin-fashion-bulk-bar" role="toolbar" aria-label="Thao tác hàng loạt">
+          <div className="admin-fashion-bulk-count">
+            <span>{selectedIds.length}</span> đã chọn
+          </div>
+          <button
+            type="button"
+            className="admin-fashion-bulk-btn is-primary"
+            onClick={() => {
+              setBulkPrice('5000');
+              setShowBulkPriceModal(true);
+            }}
+          >
+            ⚡ Đăng bán hàng loạt
+          </button>
+          <button
+            type="button"
+            className="admin-fashion-bulk-btn is-secondary"
+            onClick={() => {
+              setBulkPrice('-1');
+              setShowBulkPriceModal(true);
+            }}
+          >
+            🔒 Khóa bán ({selectedIds.length})
+          </button>
+          <button
+            type="button"
+            className="admin-fashion-bulk-btn is-secondary"
+            onClick={() => setShowGroupModal(true)}
+          >
+            💾 Lưu thành nhóm
+          </button>
+          <button
+            type="button"
+            className="admin-fashion-bulk-btn is-danger"
+            onClick={() => setSelectedIds([])}
+          >
+            Bỏ chọn
+          </button>
+        </div>
+      )}
+
+      {/* 6. Edit Item Drawer */}
+      {editingItem && (
+        <div
+          className="admin-drawer-backdrop"
+          role="presentation"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setEditingItem(null);
+          }}
+        >
+          <aside className="admin-player-drawer" role="dialog" aria-modal="true" aria-labelledby="fashion-edit-title">
+            <header>
+              <div>
+                <span>CHỈNH SỬA CẢI TRANG #{editingItem.id}</span>
+                <h2 id="fashion-edit-title">{editingItem.name}</h2>
               </div>
-              <span className="text-sm font-medium text-zinc-200">đã chọn</span>
-            </div>
-            
-            <button
-              onClick={() => setShowSaveGroupModal(true)}
-              className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-indigo-400 hover:bg-indigo-500/10 transition-colors"
-            >
-              <BookmarkPlus className="h-4 w-4" />
-              Lưu thành nhóm
-            </button>
-            
-            <button
-              onClick={() => setShowBulkModal(true)}
-              className="flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 transition-all hover:-translate-y-0.5"
-            >
-              <Tag className="h-4 w-4" />
-              Đăng bán sự kiện
-            </button>
-            
-            <button
-              onClick={() => setSelectedIds([])}
-              className="ml-2 rounded-full p-2 text-zinc-400 hover:bg-white/10 hover:text-white transition-colors"
-            >
-              <XCircle className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
-      )}
+              <button type="button" onClick={() => setEditingItem(null)} aria-label="Đóng">×</button>
+            </header>
 
-      {/* Bulk Update Modal */}
-      {showBulkModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
-            <h3 className="text-xl font-bold text-white mb-2">Đăng bán hàng loạt</h3>
-            <p className="text-sm text-zinc-400 mb-6">
-              Bạn đang chọn <strong className="text-emerald-400">{selectedIds.length}</strong> cải trang để cập nhật giá.
-              Đặt giá <strong>-1</strong> để khóa.
-            </p>
-            
-            <div className="space-y-2 mb-8">
-              <label className="text-sm font-medium text-zinc-300">Giá bán mới</label>
-              <div className="relative">
-                <input
-                  type="number"
-                  value={bulkPriceInput}
-                  onChange={(e) => setBulkPriceInput(parseInt(e.target.value) || 0)}
-                  className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-white placeholder:text-zinc-600 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition-all"
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-zinc-500">Đơn vị</span>
-              </div>
-            </div>
-            
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowBulkModal(false)}
-                className="rounded-xl px-4 py-2 text-sm font-medium text-zinc-400 hover:bg-white/5 transition-colors"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={handleBulkUpdatePrice}
-                disabled={actionLoading === 'bulk_update'}
-                className="flex items-center gap-2 rounded-xl bg-emerald-500 px-6 py-2 text-sm font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 transition-colors disabled:opacity-50"
-              >
-                {actionLoading === 'bulk_update' && <Loader2 className="h-4 w-4 animate-spin" />}
-                Xác nhận đăng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            <div className="admin-drawer-body">
+              <form onSubmit={handleSubmitEdit} style={{ display: 'grid', gap: '16px' }}>
+                <label className="admin-account-action-label" style={{ display: 'grid', gap: '6px', fontSize: '11px', fontWeight: 800, color: 'var(--admin-navy)' }}>
+                  Tên cải trang
+                  <input
+                    type="text"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    required
+                    style={{ padding: '10px 12px', border: '1px solid #d3d9e2', borderRadius: '7px', fontSize: '12px' }}
+                  />
+                </label>
 
-      {/* Save Group Modal */}
-      {showSaveGroupModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
-            <h3 className="text-xl font-bold text-white mb-2">Lưu nhóm sự kiện</h3>
-            <p className="text-sm text-zinc-400 mb-6">
-              Lưu <strong className="text-indigo-400">{selectedIds.length}</strong> cải trang vào bộ nhớ tạm để tái sử dụng sau này.
-            </p>
-            
-            <div className="space-y-2 mb-8">
-              <label className="text-sm font-medium text-zinc-300">Tên nhóm</label>
-              <input
-                type="text"
-                placeholder="VD: Sự kiện Halloween 2026..."
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-white focus:border-indigo-500/50 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all"
-              />
-            </div>
-            
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowSaveGroupModal(false)}
-                className="rounded-xl px-4 py-2 text-sm font-medium text-zinc-400 hover:bg-white/5 transition-colors"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={handleSaveGroup}
-                disabled={!newGroupName.trim()}
-                className="flex items-center gap-2 rounded-xl bg-indigo-500 px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-400 transition-colors disabled:opacity-50"
-              >
-                <Save className="h-4 w-4" />
-                Lưu
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Load Group Modal */}
-      {showLoadGroupModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-950 p-6 shadow-2xl max-h-[80vh] flex flex-col">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-white">Nhóm sự kiện đã lưu</h3>
-              <button onClick={() => setShowLoadGroupModal(false)} className="text-zinc-500 hover:text-white">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            
-            <div className="overflow-y-auto pr-2 space-y-3 flex-1">
-              {savedGroups.length === 0 ? (
-                <div className="text-center py-8 text-zinc-500">
-                  <BookmarkPlus className="h-8 w-8 mx-auto mb-3 opacity-50" />
-                  Chưa có nhóm nào được lưu.
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <label style={{ display: 'grid', gap: '6px', fontSize: '11px', fontWeight: 800, color: 'var(--admin-navy)' }}>
+                    Icon ID
+                    <input
+                      type="number"
+                      min="0"
+                      value={editForm.icon}
+                      onChange={(e) => setEditForm({ ...editForm, icon: e.target.value })}
+                      required
+                      style={{ padding: '10px 12px', border: '1px solid #d3d9e2', borderRadius: '7px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+                    />
+                  </label>
+                  <label style={{ display: 'grid', gap: '6px', fontSize: '11px', fontWeight: 800, color: 'var(--admin-navy)' }}>
+                    Giá bán (Beri) <small style={{ color: '#8895a8', fontWeight: 500 }}>-1 là khóa</small>
+                    <input
+                      type="number"
+                      min="-1"
+                      value={editForm.price}
+                      onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
+                      required
+                      style={{ padding: '10px 12px', border: '1px solid #d3d9e2', borderRadius: '7px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+                    />
+                  </label>
                 </div>
-              ) : (
-                savedGroups.map((g, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-4 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-colors">
-                    <div>
-                      <h4 className="font-medium text-white">{g.name}</h4>
-                      <p className="text-xs text-zinc-500">{g.ids.length} cải trang</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button 
-                        onClick={() => handleDeleteGroup(idx)}
-                        className="p-2 rounded-lg text-rose-400 hover:bg-rose-400/10 transition-colors"
-                        title="Xóa nhóm"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                      <button 
-                        onClick={() => handleLoadGroup(g.ids)}
-                        className="px-4 py-2 rounded-lg bg-indigo-500/20 text-indigo-400 font-medium hover:bg-indigo-500/30 transition-colors text-sm"
-                      >
-                        Tải
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
+
+                <label style={{ display: 'grid', gap: '6px', fontSize: '11px', fontWeight: 800, color: 'var(--admin-navy)' }}>
+                  Mô tả chỉ số (Info)
+                  <textarea
+                    rows={4}
+                    value={editForm.info}
+                    onChange={(e) => setEditForm({ ...editForm, info: e.target.value })}
+                    style={{ padding: '10px 12px', border: '1px solid #d3d9e2', borderRadius: '7px', fontSize: '12px', lineHeight: '1.5' }}
+                  />
+                </label>
+
+                <label style={{ display: 'grid', gap: '6px', fontSize: '11px', fontWeight: 800, color: 'var(--admin-navy)' }}>
+                  Mwear (Trang bị / Tọa độ part)
+                  <input
+                    type="text"
+                    value={editForm.mwear}
+                    onChange={(e) => setEditForm({ ...editForm, mwear: e.target.value })}
+                    placeholder="[-1, 299, -1, 300, ...]"
+                    style={{ padding: '10px 12px', border: '1px solid #d3d9e2', borderRadius: '7px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}
+                  />
+                </label>
+
+                <label style={{ display: 'grid', gap: '6px', fontSize: '11px', fontWeight: 800, color: 'var(--admin-navy)' }}>
+                  OP (Options chỉ số)
+                  <input
+                    type="text"
+                    value={editForm.op}
+                    onChange={(e) => setEditForm({ ...editForm, op: e.target.value })}
+                    placeholder="[[1, 100], [13, 100], ...]"
+                    style={{ padding: '10px 12px', border: '1px solid #d3d9e2', borderRadius: '7px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}
+                  />
+                </label>
+
+                {editError && (
+                  <p className="admin-action-error" role="alert">{editError}</p>
+                )}
+
+                <div style={{ marginTop: '16px', display: 'flex', gap: '10px' }}>
+                  <button
+                    type="submit"
+                    className="admin-gift-save"
+                    style={{ flex: 1 }}
+                    disabled={isSavingEdit}
+                  >
+                    {isSavingEdit ? 'Đang lưu…' : 'Lưu thay đổi'}
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-secondary-button"
+                    onClick={() => setEditingItem(null)}
+                  >
+                    Hủy
+                  </button>
+                </div>
+              </form>
             </div>
+          </aside>
+        </div>
+      )}
+
+      {/* 7. Bulk Update Modal */}
+      {showBulkPriceModal && (
+        <div
+          className="admin-modal-backdrop"
+          role="presentation"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setShowBulkPriceModal(false);
+          }}
+        >
+          <div className="admin-modal-card" role="dialog" aria-modal="true" aria-labelledby="bulk-price-title">
+            <header>
+              <span>THAO TÁC HÀNG LOẠT</span>
+              <h2 id="bulk-price-title">Thiết lập giá {selectedIds.length} cải trang</h2>
+              <p>Nhập số Beri để mở bán, hoặc nhập -1 để khóa toàn bộ danh sách đã chọn.</p>
+            </header>
+            <form onSubmit={handleSubmitBulkPrice}>
+              <label style={{ display: 'grid', gap: '7px', fontSize: '11px', fontWeight: 800, color: 'var(--admin-navy)' }}>
+                Giá bán mới (Beri)
+                <input
+                  type="number"
+                  min="-1"
+                  value={bulkPrice}
+                  onChange={(e) => setBulkPrice(e.target.value)}
+                  required
+                  autoFocus
+                  style={{
+                    padding: '12px 14px',
+                    border: '1px solid #c8d0da',
+                    borderRadius: '8px',
+                    fontSize: '15px',
+                    fontFamily: 'var(--font-mono)',
+                    fontWeight: 800,
+                  }}
+                />
+              </label>
+
+              <div className="admin-modal-actions">
+                <button
+                  type="button"
+                  className="admin-modal-btn-cancel"
+                  onClick={() => setShowBulkPriceModal(false)}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="admin-modal-btn-submit"
+                  disabled={isBulkSubmitting}
+                >
+                  {isBulkSubmitting ? 'Đang cập nhật…' : 'Xác nhận thay đổi'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
-      {/* Full Edit Modal */}
-      {showEditModal && editItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in p-4">
-          <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-zinc-950 p-6 md:p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-2xl font-bold text-white mb-6">Chỉnh sửa #{editItem.id}</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-300">Tên cải trang</label>
-                <input
-                  type="text"
-                  value={editForm.name || ''}
-                  onChange={(e) => setEditForm({...editForm, name: e.target.value})}
-                  className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-2.5 text-white focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition-all"
-                />
+      {/* 8. Saved Groups Drawer / Modal */}
+      {showGroupModal && (
+        <div
+          className="admin-modal-backdrop"
+          role="presentation"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setShowGroupModal(false);
+          }}
+        >
+          <div className="admin-modal-card" style={{ width: 'min(580px, calc(100% - 32px))' }} role="dialog" aria-modal="true" aria-labelledby="groups-title">
+            <header>
+              <span>QUẢN LÝ SỰ KIỆN</span>
+              <h2 id="groups-title">Đợt phát hành sự kiện</h2>
+              <p>Gom nhóm các cải trang theo sự kiện (Noel, Tết, Halloween) để chọn và đăng bán nhanh.</p>
+            </header>
+
+            <div style={{ padding: '24px' }}>
+              {/* Form save group from current selection */}
+              {selectedIds.length > 0 && (
+                <form
+                  onSubmit={handleSaveGroup}
+                  style={{
+                    marginBottom: '24px',
+                    padding: '16px',
+                    background: '#f5f7fb',
+                    border: '1px solid #d9e0eb',
+                    borderRadius: '10px',
+                    display: 'grid',
+                    gap: '10px',
+                  }}
+                >
+                  <strong style={{ fontSize: '12px', color: 'var(--admin-navy)' }}>
+                    Lưu {selectedIds.length} cải trang đang chọn thành nhóm mới:
+                  </strong>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      placeholder="Ví dụ: Sự kiện Noel 2026"
+                      value={newGroupName}
+                      onChange={(e) => setNewGroupName(e.target.value)}
+                      required
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        border: '1px solid #cbd4e1',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                      }}
+                    />
+                    <button
+                      type="submit"
+                      className="admin-modal-btn-submit"
+                      style={{ padding: '0 16px', borderRadius: '6px' }}
+                    >
+                      Lưu
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* List of saved groups */}
+              <div style={{ display: 'grid', gap: '10px', maxHeight: '340px', overflowY: 'auto' }}>
+                {savedGroups.length > 0 ? (
+                  savedGroups.map((g, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        padding: '14px 16px',
+                        border: '1px solid #e2e7ef',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                      }}
+                    >
+                      <div>
+                        <strong style={{ fontSize: '13px', color: 'var(--admin-navy)', display: 'block' }}>
+                          {g.name}
+                        </strong>
+                        <small style={{ color: '#77869a', fontSize: '10px' }}>
+                          {g.ids.length} cải trang (ID: {g.ids.slice(0, 5).join(', ')}{g.ids.length > 5 ? '…' : ''})
+                        </small>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          type="button"
+                          className="admin-secondary-button"
+                          style={{ minHeight: '34px', padding: '0 12px', fontSize: '10px' }}
+                          onClick={() => handleApplyGroup(g)}
+                        >
+                          Chọn nhóm này
+                        </button>
+                        <button
+                          type="button"
+                          style={{
+                            minHeight: '34px',
+                            padding: '0 10px',
+                            border: '1px solid #f0ccd3',
+                            borderRadius: '6px',
+                            background: '#fff5f6',
+                            color: 'var(--admin-red)',
+                            cursor: 'pointer',
+                            fontSize: '10px',
+                            fontWeight: 700,
+                          }}
+                          onClick={() => handleDeleteGroup(idx)}
+                          aria-label={`Xóa nhóm ${g.name}`}
+                        >
+                          Xóa
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ padding: '32px 0', textAlign: 'center', color: '#8896a7', fontSize: '11px' }}>
+                    Chưa có nhóm sự kiện nào được lưu. Hãy tick chọn các cải trang ngoài danh sách và lưu thành đợt phát hành!
+                  </div>
+                )}
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-300">Icon ID</label>
-                <input
-                  type="number"
-                  value={editForm.icon || 0}
-                  onChange={(e) => setEditForm({...editForm, icon: parseInt(e.target.value) || 0})}
-                  className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-2.5 text-white focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition-all font-mono"
-                />
+
+              <div className="admin-modal-actions" style={{ marginTop: '20px' }}>
+                <button
+                  type="button"
+                  className="admin-modal-btn-cancel"
+                  onClick={() => setShowGroupModal(false)}
+                >
+                  Đóng
+                </button>
               </div>
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-medium text-zinc-300">Mô tả (Info)</label>
-                <textarea
-                  value={editForm.info || ''}
-                  onChange={(e) => setEditForm({...editForm, info: e.target.value})}
-                  className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-white focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition-all resize-y min-h-[80px]"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-300">Mwear</label>
-                <input
-                  type="text"
-                  value={editForm.mwear || ''}
-                  onChange={(e) => setEditForm({...editForm, mwear: e.target.value})}
-                  className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-2.5 text-zinc-300 font-mono text-sm focus:border-emerald-500/50 focus:outline-none transition-all"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-300">OP (Options)</label>
-                <input
-                  type="text"
-                  value={editForm.op || ''}
-                  onChange={(e) => setEditForm({...editForm, op: e.target.value})}
-                  className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-2.5 text-zinc-300 font-mono text-sm focus:border-emerald-500/50 focus:outline-none transition-all"
-                />
-              </div>
-              <div className="space-y-2 md:col-span-2 pt-4 border-t border-white/5">
-                <label className="text-sm font-medium text-emerald-400">Giá bán (Nhập -1 để khóa)</label>
-                <input
-                  type="number"
-                  value={editForm.price ?? -1}
-                  onChange={(e) => setEditForm({...editForm, price: parseInt(e.target.value)})}
-                  className="w-full rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-emerald-300 focus:border-emerald-500 focus:outline-none transition-all font-mono text-lg"
-                />
-              </div>
-            </div>
-            
-            <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="rounded-xl px-5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-white/5 transition-colors"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={handleFullUpdate}
-                disabled={actionLoading === 'full_update'}
-                className="flex items-center gap-2 rounded-xl bg-emerald-500 px-6 py-2.5 text-sm font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 transition-colors disabled:opacity-50"
-              >
-                {actionLoading === 'full_update' && <Loader2 className="h-4 w-4 animate-spin" />}
-                Lưu thay đổi
-              </button>
             </div>
           </div>
         </div>
