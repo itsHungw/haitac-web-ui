@@ -1,13 +1,13 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { Card } from '@/components/ui/Card';
+import { Parchment } from '@/components/ui/Parchment';
 
 export interface AuthCardProps { title: string; subtitle?: string; children: ReactNode }
 
 export function AuthCard({ title, subtitle, children }: AuthCardProps) {
   return (
-    <Card className="auth-card">
+    <Parchment className="auth-card">
       <div className="auth-card__heading">
         <Link href="/" className="auth-card__brand" aria-label="Về trang chủ">
           <Image src="/images/logo.png" alt="Hải Tặc Tí Hon" width={56} height={56} className="pixelated" />
@@ -18,6 +18,6 @@ export function AuthCard({ title, subtitle, children }: AuthCardProps) {
         {subtitle && <p>{subtitle}</p>}
       </div>
       {children}
-    </Card>
+    </Parchment>
   );
 }

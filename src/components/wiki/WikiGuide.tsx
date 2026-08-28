@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { DevilFruitIcon } from '@/components/icons/DevilFruitIcon';
+import { Parchment } from '@/components/ui/Parchment';
 
 type WikiEntry = { key: string; id: string | number; name: string; source: string; [key: string]: unknown };
 type Skill = { id: number; icon?: number; logo?: string; gif?: string | null; name: string; kind: string; damage: number; mana: number; cooldownMs: number; range: number; targets: number; info: string; maxLevel?: number };
@@ -318,15 +319,16 @@ export function WikiGuide() {
       <div className="wiki-overview__stats" aria-label="Thống kê Wiki"><Stat label="Bản đồ" value={meta?.counts.maps ?? 152} /><Stat label="Chuỗi nhiệm vụ" value={meta?.counts.quests ?? 158} /><Stat label="Mục vật phẩm" value={meta?.counts.items ?? 1359} /></div>
     </div>
 
-    <div className="page-width wiki-category-dock" role="tablist" aria-label="Chuyên mục Wiki">{CATEGORIES.map((item) => {
+    <Parchment className="page-width wiki-scroll-shell">
+    <div className="wiki-category-dock" role="tablist" aria-label="Chuyên mục Wiki">{CATEGORIES.map((item) => {
       const Icon = item.icon; const selected = category === item.id;
       return <button type="button" role="tab" aria-selected={selected} className={selected ? 'is-active' : ''} key={item.id} onClick={() => { setCategory(item.id); setActiveKey(''); setQuery(''); }}><Icon size={18} strokeWidth={2.2} aria-hidden="true" /><span>{item.label}</span><b>{formatNumber(meta?.counts[item.id] ?? item.fallback)}</b></button>;
     })}</div>
 
-    <div className="page-width wiki-toolbar"><label htmlFor="wiki-search"><Search size={18} aria-hidden="true" /><span>Tìm trong {categoryConfig.label}</span></label><input id="wiki-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Nhập tên hoặc ID ${categoryConfig.label.toLocaleLowerCase('vi')}...`} /><span aria-live="polite">{formatNumber(filtered.length)} / {formatNumber(totalCount)} mục</span></div>
-    {filters.length > 1 && <div className="page-width wiki-filters" aria-label="Bộ lọc">{filters.map((item) => <button type="button" className={filter === item ? 'is-active' : ''} aria-pressed={filter === item} key={item} onClick={() => setFilter(item)}>{item}</button>)}</div>}
+    <div className="wiki-toolbar"><label htmlFor="wiki-search"><Search size={18} aria-hidden="true" /><span>Tìm trong {categoryConfig.label}</span></label><input id="wiki-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Nhập tên hoặc ID ${categoryConfig.label.toLocaleLowerCase('vi')}...`} /><span aria-live="polite">{formatNumber(filtered.length)} / {formatNumber(totalCount)} mục</span></div>
+    {filters.length > 1 && <div className="wiki-filters" aria-label="Bộ lọc">{filters.map((item) => <button type="button" className={filter === item ? 'is-active' : ''} aria-pressed={filter === item} key={item} onClick={() => setFilter(item)}>{item}</button>)}</div>}
 
-    <div className="page-width wiki-layout">
+    <div className="wiki-layout">
       <aside className="wiki-results" aria-label={`Danh sách ${categoryConfig.label}`}><header><span>{categoryConfig.label}</span><b>{formatNumber(filtered.length)}</b></header><div className="wiki-result-list">
         {loading && Array.from({ length: 8 }, (_, index) => <div className="wiki-skeleton" key={index} />)}
         {!loading && error && <div className="wiki-state"><CircleHelp size={24} /><p>{error}</p></div>}
@@ -335,6 +337,7 @@ export function WikiGuide() {
       </div>{filtered.length > VISIBLE_LIMIT && <p className="wiki-result-note">Đang hiện {VISIBLE_LIMIT} mục đầu. Nhập thêm từ khóa để thu hẹp {formatNumber(filtered.length)} kết quả.</p>}</aside>
       <article className="wiki-detail" id="wiki-detail" aria-live="polite">{loading && <div className="wiki-detail-loading"><div className="wiki-skeleton" /><div className="wiki-skeleton" /><div className="wiki-skeleton" /></div>}{!loading && activeEntry && <Detail category={category} entry={activeEntry} />}{!loading && !activeEntry && <div className="wiki-state"><CircleHelp size={30} /><h2>Chưa có dữ liệu để hiển thị</h2><p>Hãy đổi bộ lọc hoặc từ khóa tìm kiếm.</p></div>}</article>
     </div>
-    <p className="page-width wiki-disclaimer"><Database size={14} aria-hidden="true" /> Snapshot được sinh từ `deploy.sql`, Java server và Unity client. Tên cũ trong dữ liệu được giữ nguyên để khớp với game.</p>
+    <p className="wiki-disclaimer"><Database size={14} aria-hidden="true" /> Snapshot được sinh từ `deploy.sql`, Java server và Unity client. Tên cũ trong dữ liệu được giữ nguyên để khớp với game.</p>
+    </Parchment>
   </section>;
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Parchment } from '@/components/ui/Parchment';
 
 const NEWS = [
   { category: 'SỰ KIỆN', date: '16.06.2026', title: 'Đấu Trường Rực Lửa 2026', desc: 'Không khí bóng đá đang nóng lên từng ngày trên Đại Hải Trình.', href: 'https://haitactihon.com/news.php?id=170' },
@@ -34,6 +35,7 @@ export function NewsSection() {
             </div>
           </div>
 
+          <Parchment className="news-scroll">
           <div className="news-ledger">
             {entries.map((entry, index) => (
               <a className="news-row" key={entry.title} href={entry.href} target="_blank" rel="noopener noreferrer">
@@ -47,6 +49,7 @@ export function NewsSection() {
               </a>
             ))}
           </div>
+          </Parchment>
         </div>
 
         <aside className="captain-board" aria-label="Hành trang nhanh">

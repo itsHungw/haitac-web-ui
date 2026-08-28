@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { InnerMasthead } from '@/components/layout/InnerMasthead';
 import { PublicPageShell } from '@/components/layout/PublicPageShell';
+import { Parchment } from '@/components/ui/Parchment';
 
 interface DownloadPlatform {
   platform: string;
@@ -79,14 +80,15 @@ export default function DownloadPage() {
         />
         <section className="download-section">
           <div className="page-width">
-            <div className="release-note">
-              <span>BẢN HIỆN HÀNH</span>
-              <strong>Version 129</strong>
-              <p>Cập nhật ngày 21.10.2025</p>
-            </div>
-            <div className="download-grid">
-              {DOWNLOADS.map((item, index) => (
-                <article className="download-card" key={item.platform}>
+            <Parchment className="download-scroll">
+              <div className="release-note">
+                <span>BẢN HIỆN HÀNH</span>
+                <strong>Version 129</strong>
+                <p>Cập nhật ngày 21.10.2025</p>
+              </div>
+              <div className="download-grid">
+                {DOWNLOADS.map((item, index) => (
+                  <article className="download-card paper-corners" key={item.platform}>
                   <div className="download-card__head">
                     <span>0{index + 1}</span>
                     <div className="download-card__logo">
@@ -127,12 +129,13 @@ export default function DownloadPage() {
                       ))}
                     </div>
                   </div>
-                </article>
-              ))}
-            </div>
-            <p className="download-source">
-              Liên kết tải được dẫn trực tiếp tới các kênh phân phối chính thức của Hải Tặc Tí Hon.
-            </p>
+                  </article>
+                ))}
+              </div>
+              <p className="download-source">
+                Liên kết tải được dẫn trực tiếp tới các kênh phân phối chính thức của Hải Tặc Tí Hon.
+              </p>
+            </Parchment>
           </div>
         </section>
       </main>

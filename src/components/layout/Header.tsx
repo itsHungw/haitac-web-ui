@@ -24,7 +24,7 @@ interface NavItem {
 const NAV_LINKS: NavItem[] = [
   { label: 'Trang chủ', href: '/', image: '/images/bang_trang_chu.png' },
   { label: 'Tải game', href: '/tai-game', image: '/images/bang_tai_game.png' },
-  { label: 'Diễn đàn', href: 'https://haitactihon.com/forum', external: true, image: '/images/bang_dien_dan.png' },
+  { label: 'Diễn đàn', href: '/dien-dan', image: '/images/bang_dien_dan.png' },
   { label: 'Hướng dẫn', href: '/huong-dan', image: '/images/bang_huong_dan.png' },
 ];
 
