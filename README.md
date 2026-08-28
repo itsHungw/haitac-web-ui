@@ -1,6 +1,6 @@
 # htth-web
 
-Web frontend portal for Hải Tặc Tí Hon. Built with **Next.js 15**, **React 19**, and **TypeScript**. Deployed on Vercel and proxies API calls to `htthapi.aqueduct.me` via rewrites.
+Web frontend portal for Hải Tặc Tí Hon. Built with **Next.js 15**, **React 19**, and **TypeScript**. Deployed on Vercel and proxies API calls.
 
 ---
 
