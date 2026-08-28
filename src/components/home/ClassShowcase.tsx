@@ -106,6 +106,7 @@ const CHARACTER_CLASSES: CharacterClass[] = [
         description: 'Dồn toàn lực vào nắm đấm tốc độ cao tạo cú chấn động thẳng vào mục tiêu.',
         effect: 'fist',
         icon: '/images/skills/vo-si/skill-1.png',
+        gif: '/images/skills/vo-si/skill-1.gif',
       },
       {
         name: 'Bazooka',
@@ -113,6 +114,7 @@ const CHARACTER_CLASSES: CharacterClass[] = [
         description: 'Kéo căng hai cánh tay phóng thẳng về phía trước đẩy lùi mọi kẻ cản đường.',
         effect: 'guard',
         icon: '/images/skills/vo-si/skill-2.png',
+        gif: '/images/skills/vo-si/skill-2.gif',
       },
       {
         name: 'Liên hoàn cú đấm',
@@ -120,6 +122,7 @@ const CHARACTER_CLASSES: CharacterClass[] = [
         description: 'Tung ra hàng trăm cú đấm dồn dập áp đảo toàn diện đối thủ.',
         effect: 'rage',
         icon: '/images/skills/vo-si/skill-3.png',
+        gif: '/images/skills/vo-si/skill-3.gif',
       },
     ],
   },
@@ -171,6 +174,7 @@ const CHARACTER_CLASSES: CharacterClass[] = [
         description: 'Xoay gậy tạo luồng gió sắc lẹm phóng thẳng về phía đối phương.',
         effect: 'arrow',
         icon: '/images/skills/hoa-tieu/skill-1.png',
+        gif: '/images/skills/hoa-tieu/skill-1.gif',
       },
       {
         name: 'Bong bóng tích điện',
@@ -178,6 +182,7 @@ const CHARACTER_CLASSES: CharacterClass[] = [
         description: 'Thả các bong bóng tích điện tĩnh lơ lửng phóng điện giật đối thủ trong tầm.',
         effect: 'frost',
         icon: '/images/skills/hoa-tieu/skill-2.png',
+        gif: '/images/skills/hoa-tieu/skill-2.gif',
       },
       {
         name: 'Bão sấm',
@@ -185,6 +190,7 @@ const CHARACTER_CLASSES: CharacterClass[] = [
         description: 'Triệu hồi đám mây đen giáng sét hàng loạt quét sạch toàn bộ chiến trường.',
         effect: 'rain',
         icon: '/images/skills/hoa-tieu/skill-3.png',
+        gif: '/images/skills/hoa-tieu/skill-3.gif',
       },
     ],
   },
