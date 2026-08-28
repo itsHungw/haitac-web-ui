@@ -20,6 +20,7 @@ interface CharacterClass {
   weapon: string;
   description: string;
   accent: string;
+  characterImage: string;
   skills: ClassSkill[];
 }
 
@@ -29,7 +30,8 @@ const CHARACTER_CLASSES: CharacterClass[] = [
     name: 'Kiếm Sĩ',
     role: 'CÔNG KÍCH · CƠ ĐỘNG',
     weapon: 'Trường kiếm',
-    accent: '#64d8ff',
+    accent: '#7f9b45',
+    characterImage: '/assets/characters/zoro.jpg',
     description: 'Di chuyển sắc bén, nối liền các nhát chém uy lực và kết liễu mục tiêu trong chớp mắt.',
     skills: [
       {
@@ -63,7 +65,8 @@ const CHARACTER_CLASSES: CharacterClass[] = [
     name: 'Xạ Thủ',
     role: 'TẦM XA · BỘC PHÁ',
     weapon: 'Song súng hỏa mai',
-    accent: '#ffd15a',
+    accent: '#c88b35',
+    characterImage: '/assets/characters/usop.jpg',
     description: 'Bậc thầy tác chiến tầm xa, kiểm soát cự ly an toàn và dội hỏa lực bùng nổ lên chiến trường.',
     skills: [
       {
@@ -97,7 +100,8 @@ const CHARACTER_CLASSES: CharacterClass[] = [
     name: 'Võ Sĩ',
     role: 'CẬN CHIẾN · CHỊU ĐÒN',
     weapon: 'Song quyền',
-    accent: '#ef5a3c',
+    accent: '#d94b3d',
+    characterImage: '/assets/characters/luffy.jpg',
     description: 'Áp sát dũng mãnh, chống chịu phi thường và càng nguy hiểm khi trận đấu kéo dài.',
     skills: [
       {
@@ -131,7 +135,8 @@ const CHARACTER_CLASSES: CharacterClass[] = [
     name: 'Đầu Bếp',
     role: 'CƯỜNG CƯỚC · LIÊN HOÀN',
     weapon: 'Hắc cước',
-    accent: '#ff9a3c',
+    accent: '#438fc5',
+    characterImage: '/assets/characters/sanji.jpg',
     description: 'Bộ pháp thoăn thoắt, những cú đá rực lửa xé toạc không khí với tốc độ chóng mặt.',
     skills: [
       {
@@ -165,7 +170,8 @@ const CHARACTER_CLASSES: CharacterClass[] = [
     name: 'Hoa Tiêu',
     role: 'KHỐNG CHẾ · PHÉP THUẬT',
     weapon: 'Gậy thời tiết',
-    accent: '#7ee08b',
+    accent: '#d7739a',
+    characterImage: '/assets/characters/nami.jpg',
     description: 'Điều khiển sấm sét, lốc xoáy và khí hậu biển cả để khống chế toàn bộ cục diện trận đấu.',
     skills: [
       {
@@ -240,8 +246,17 @@ export function ClassShowcase() {
               aria-controls="class-showcase-panel"
               className={activeClassIndex === index ? 'is-active' : ''}
               onClick={() => selectClass(index)}
+              style={{ '--tab-accent': item.accent } as React.CSSProperties}
             >
-              <span>0{index + 1}</span>
+              <span className="class-selector__portrait" aria-hidden="true">
+                <Image
+                  src={item.characterImage}
+                  alt=""
+                  fill
+                  sizes="(max-width: 560px) 20vw, (max-width: 820px) 130px, 240px"
+                />
+              </span>
+              <span className="class-selector__index">0{index + 1}</span>
               <strong>{item.name}</strong>
               <small>{item.weapon}</small>
             </button>
