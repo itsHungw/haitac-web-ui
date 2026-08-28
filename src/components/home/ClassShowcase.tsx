@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { SkillAnimation, type SkillEffect } from './SkillAnimation';
 
 interface ClassSkill {
@@ -8,9 +9,12 @@ interface ClassSkill {
   type: string;
   description: string;
   effect: SkillEffect;
+  icon?: string;
+  gif?: string;
 }
 
 interface CharacterClass {
+  id: string;
   name: string;
   role: string;
   weapon: string;
@@ -21,48 +25,110 @@ interface CharacterClass {
 
 const CHARACTER_CLASSES: CharacterClass[] = [
   {
-    name: 'Đánh Tay', role: 'CẬN CHIẾN · CHỊU ĐÒN', weapon: 'Song quyền', accent: '#ef5a3c',
-    description: 'Áp sát đối thủ, chống chịu tốt và càng nguy hiểm khi trận chiến kéo dài.',
+    id: 'kiem-si',
+    name: 'Kiếm Sĩ',
+    role: 'CÔNG KÍCH · CƠ ĐỘNG',
+    weapon: 'Trường kiếm',
+    accent: '#64d8ff',
+    description: 'Di chuyển sắc bén, nối liền các nhát chém uy lực và kết liễu mục tiêu trong chớp mắt.',
     skills: [
-      { name: 'Hải Chấn Quyền', type: 'Sát thương đơn', description: 'Dồn lực vào nắm đấm và tạo cú chấn động thẳng vào mục tiêu.', effect: 'fist' },
-      { name: 'Thiết Sơn Công', type: 'Phòng thủ', description: 'Giữ vững thế đứng, hấp thụ đòn đánh rồi phản công ở cự ly gần.', effect: 'guard' },
-      { name: 'Bạo Khí', type: 'Cường hóa', description: 'Bùng nổ khí lực, tăng nhịp tấn công trong một khoảng thời gian ngắn.', effect: 'rage' },
+      {
+        name: 'Phi Thiên Trảm',
+        type: 'Chém lướt · Đột kích',
+        description: 'Lướt nhanh qua đội hình địch bằng một đường kiếm sắc lẹm và chuẩn xác.',
+        effect: 'dash',
+        icon: '/images/skills/kiem-si/skill-1.png',
+        gif: '/images/skills/kiem-si/skill-1.gif',
+      },
+      {
+        name: 'Kiếm Khí',
+        type: 'Tầm trung · Trảm kích',
+        description: 'Phóng một luồng kiếm khí áp đảo xuyên qua cự ly phía trước gây sát thương nặng.',
+        effect: 'slash',
+        icon: '/images/skills/kiem-si/skill-2.png',
+        gif: '/images/skills/kiem-si/skill-2.gif',
+      },
+      {
+        name: 'Liên Hoàn Kiếm',
+        type: 'Đa đòn · Khóa mục tiêu',
+        description: 'Tung chuỗi trảm kích liên tiếp trong vùng bão kiếm, không cho đối thủ cơ hội thoát.',
+        effect: 'storm',
+        icon: '/images/skills/kiem-si/skill-3.png',
+        gif: '/images/skills/kiem-si/skill-3.gif',
+      },
     ],
   },
   {
-    name: 'Kiếm', role: 'CÔNG KÍCH · CƠ ĐỘNG', weapon: 'Trường kiếm', accent: '#64d8ff',
-    description: 'Di chuyển sắc bén, nối liền các nhát chém và kết thúc mục tiêu trong chớp mắt.',
+    id: 'xa-thu',
+    name: 'Xạ Thủ',
+    role: 'TẦM XA · BỘC PHÁ',
+    weapon: 'Song súng hỏa mai',
+    accent: '#ffd15a',
+    description: 'Bậc thầy tác chiến tầm xa, kiểm soát cự ly an toàn và dội hỏa lực bùng nổ lên chiến trường.',
     skills: [
-      { name: 'Phi Thiên Trảm', type: 'Chém lướt', description: 'Lướt qua đội hình địch bằng một đường kiếm nhanh và gọn.', effect: 'dash' },
-      { name: 'Kiếm Khí', type: 'Tầm trung', description: 'Phóng một lưỡi kiếm khí xuyên qua khoảng cách trước mặt.', effect: 'slash' },
-      { name: 'Liên Hoàn Kiếm', type: 'Đa đòn', description: 'Tạo chuỗi nhát chém liên tiếp, khóa mục tiêu trong vùng kiếm.', effect: 'storm' },
+      {
+        name: 'Double Shot (Súng Đôi)',
+        type: 'Tầm xa · Xuyên phá',
+        description: 'Rút song súng khai hỏa chuẩn xác với tốc độ cao, xuyên thẳng qua hàng phòng thủ đối phương.',
+        effect: 'bullet',
+        icon: '/images/skills/xa-thu/skill-1.png',
+        gif: '/images/skills/xa-thu/skill-1.gif',
+      },
+      {
+        name: 'Hỏa Đạn Bộc Phá',
+        type: 'Đa đòn · Thiêu đốt',
+        description: 'Nạp đạn đặc chế bắn liên hồi, kích nổ tia lửa bốc cháy dữ dội tại điểm va chạm.',
+        effect: 'burst',
+        icon: '/images/skills/xa-thu/skill-2.png',
+        gif: '/images/skills/xa-thu/skill-2.gif',
+      },
+      {
+        name: 'Lựu Đạn Gai Xương Rồng',
+        type: 'Diện rộng · Bẫy nổ',
+        description: 'Phóng chùm lựu đạn bẫy gai phát nổ diện rộng, găm mưa gai nhọn khóa chặt bước chân kẻ địch.',
+        effect: 'bomb',
+        icon: '/images/skills/xa-thu/skill-3.png',
+        gif: '/images/skills/xa-thu/skill-3.gif',
+      },
     ],
   },
   {
-    name: 'Súng', role: 'TẦM XA · BỘC PHÁ', weapon: 'Súng hỏa mai', accent: '#ffd15a',
-    description: 'Giữ khoảng cách an toàn, ngắm đúng thời điểm và tạo sát thương bùng nổ.',
+    id: 'vo-si',
+    name: 'Võ Sĩ',
+    role: 'CẬN CHIẾN · CHỊU ĐÒN',
+    weapon: 'Song quyền',
+    accent: '#ef5a3c',
+    description: 'Áp sát dũng mãnh, chống chịu phi thường và càng nguy hiểm khi trận đấu kéo dài.',
     skills: [
-      { name: 'Xuyên Phá Đạn', type: 'Xuyên mục tiêu', description: 'Viên đạn tốc độ cao xuyên thẳng qua hàng phòng thủ phía trước.', effect: 'bullet' },
-      { name: 'Liên Thanh', type: 'Đa đòn', description: 'Bắn liên tiếp ba phát, buộc đối thủ không thể đứng yên.', effect: 'burst' },
-      { name: 'Hỏa Pháo', type: 'Diện rộng', description: 'Kích nổ một viên đạn lớn, gây chấn động tại điểm va chạm.', effect: 'bomb' },
+      { name: 'Hải Chấn Quyền', type: 'Sát thương đơn', description: 'Dồn toàn lực vào nắm đấm và tạo cú chấn động thẳng vào mục tiêu.', effect: 'fist' },
+      { name: 'Thiết Sơn Công', type: 'Phòng thủ', description: 'Giữ vững thế đứng, hấp thụ sát thương rồi phản công đanh thép.', effect: 'guard' },
+      { name: 'Bạo Khí', type: 'Cường hóa', description: 'Bùng nổ khí lực toàn thân, gia tăng nhịp tấn công và tốc độ ra đòn.', effect: 'rage' },
     ],
   },
   {
-    name: 'Cung', role: 'KHỐNG CHẾ · LINH HOẠT', weapon: 'Trường cung', accent: '#7ee08b',
-    description: 'Làm chủ khoảng cách bằng những mũi tên chính xác và hiệu ứng khống chế.',
+    id: 'dau-bep',
+    name: 'Đầu Bếp',
+    role: 'CƯỜNG CƯỚC · LIÊN HOÀN',
+    weapon: 'Hắc cước',
+    accent: '#ff9a3c',
+    description: 'Bộ pháp thoăn thoắt, những cú đá rực lửa xé toạc không khí với tốc độ chóng mặt.',
     skills: [
-      { name: 'Xuyên Tâm Tiễn', type: 'Chính xác', description: 'Kéo căng dây cung và tung một mũi tên xuyên tâm cực nhanh.', effect: 'arrow' },
-      { name: 'Băng Tiễn', type: 'Làm chậm', description: 'Mũi tên lạnh đóng băng vùng va chạm và làm chậm đối thủ.', effect: 'frost' },
-      { name: 'Vũ Tiễn', type: 'Diện rộng', description: 'Gọi một trận mưa tên phủ xuống khu vực được chọn.', effect: 'rain' },
+      { name: 'Hắc Cước Phong', type: 'Đột kích', description: 'Xoay người tung đòn cước bốc lửa cuốn phăng hàng ngũ đối phương.', effect: 'cleave' },
+      { name: 'Thiểm Ảnh Cước', type: 'Đa kích', description: 'Chuỗi liên hoàn cước dồn dập vào điểm yếu của kẻ địch.', effect: 'fist' },
+      { name: 'Ác Ma Hỏa Diệm', type: 'Tuyệt kỹ', description: 'Tích tụ nhiệt độ cực cao vào gót chân cho cú dứt điểm sấm sét.', effect: 'finisher' },
     ],
   },
   {
-    name: 'Đao', role: 'BỘC PHÁ · DIỆN RỘNG', weapon: 'Đại đao', accent: '#d796ff',
-    description: 'Từng nhát đao nặng như sóng lớn, quét sạch kẻ địch trong phạm vi rộng.',
+    id: 'hoa-tieu',
+    name: 'Hoa Tiêu',
+    role: 'KHỐNG CHẾ · PHÉP THUẬT',
+    weapon: 'Gậy thời tiết',
+    accent: '#7ee08b',
+    description: 'Điều khiển sấm sét, lốc xoáy và khí hậu biển cả để khống chế toàn bộ cục diện trận đấu.',
     skills: [
-      { name: 'Toàn Phong Trảm', type: 'Quét ngang', description: 'Xoay đại đao thành một vòng chém bao phủ khu vực xung quanh.', effect: 'cleave' },
-      { name: 'Liệt Địa Trảm', type: 'Chấn động', description: 'Nện lưỡi đao xuống đất và tạo sóng chấn động chạy về phía trước.', effect: 'quake' },
-      { name: 'Bá Vương Đao', type: 'Tuyệt kỹ', description: 'Tích tụ toàn bộ sức mạnh cho một nhát đao kết liễu.', effect: 'finisher' },
+      { name: 'Lôi Điện Kích', type: 'Chính xác', description: 'Phóng tia sét tầm xa xuyên tâm gây tê liệt mục tiêu.', effect: 'arrow' },
+      { name: 'Băng Vũ Trận', type: 'Làm chậm', description: 'Gọi những khối băng tuyết phủ kín vùng va chạm làm chậm đối thủ.', effect: 'frost' },
+      { name: 'Thiên Lôi Cuồng Nộ', type: 'Diện rộng', description: 'Triệu hồi bão sét khổng lồ giáng xuống quét sạch kẻ địch.', effect: 'rain' },
     ],
   },
 ];
@@ -97,14 +163,14 @@ export function ClassShowcase() {
           <span className="eyebrow">NGŨ ĐẠI CHIẾN PHÁI</span>
           <h2>Chọn class, xem chiêu thức</h2>
         </div>
-        <p>Mỗi class có ba kỹ năng tiêu biểu. Chạm vào skill để xem cách đòn đánh vận hành trước khi ra khơi.</p>
+        <p>Mỗi chiến phái sở hữu bộ kỹ năng đặc trưng. Chạm vào từng skill để xem video thi triển chiêu thức chân thực.</p>
       </div>
 
       <div className="page-width class-lab" style={{ '--class-accent': activeClass.accent } as React.CSSProperties}>
         <div className="class-selector" role="tablist" aria-label="Chọn class nhân vật">
           {CHARACTER_CLASSES.map((item, index) => (
             <button
-              key={item.name}
+              key={item.id}
               type="button"
               role="tab"
               aria-selected={activeClassIndex === index}
@@ -132,10 +198,58 @@ export function ClassShowcase() {
         <div id="class-showcase-panel" className="class-lab__body" role="tabpanel">
           <div id="skill-preview-panel" className="skill-preview" role="tabpanel">
             <div className="skill-preview__topline">
-              <span>MINH HỌA KỸ NĂNG</span>
+              <span>MINH HỌA KỸ NĂNG {activeSkill.gif ? '• VIDEO GAMEPLAY' : ''}</span>
               <button type="button" onClick={() => setReplayKey((key) => key + 1)}>PHÁT LẠI ↻</button>
             </div>
-            <SkillAnimation key={`${activeClassIndex}-${activeSkillIndex}-${replayKey}`} effect={activeSkill.effect} accent={activeClass.accent} name={activeSkill.name} />
+
+            {/* Video / GIF preview or animated fallback */}
+            {activeSkill.gif ? (
+              <div
+                key={`${activeClass.id}-${activeSkillIndex}-${replayKey}`}
+                style={{
+                  position: 'relative',
+                  minHeight: '340px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'radial-gradient(circle at 50% 50%, #0d2847 0%, #061b31 100%)',
+                  overflow: 'hidden',
+                  borderBottom: '3px solid var(--wood-950)',
+                }}
+              >
+                {/* Scanline & ambient grid */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    opacity: 0.1,
+                    backgroundImage: 'linear-gradient(rgba(255,255,255,.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.3) 1px, transparent 1px)',
+                    backgroundSize: '24px 24px',
+                    pointerEvents: 'none',
+                  }}
+                />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`${activeSkill.gif}?k=${replayKey}`}
+                  alt={`Hoạt họa kỹ năng ${activeSkill.name}`}
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '340px',
+                    objectFit: 'contain',
+                    filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.6))',
+                    imageRendering: 'pixelated',
+                  }}
+                />
+              </div>
+            ) : (
+              <SkillAnimation
+                key={`${activeClassIndex}-${activeSkillIndex}-${replayKey}`}
+                effect={activeSkill.effect}
+                accent={activeClass.accent}
+                name={activeSkill.name}
+              />
+            )}
+
             <div className="skill-preview__caption" aria-live="polite">
               <span>{activeSkill.type}</span>
               <strong>{activeSkill.name}</strong>
@@ -147,7 +261,10 @@ export function ClassShowcase() {
             <span className="class-dossier__role">{activeClass.role}</span>
             <h3>{activeClass.name}</h3>
             <p>{activeClass.description}</p>
-            <div className="class-dossier__weapon"><span>VŨ KHÍ</span><strong>{activeClass.weapon}</strong></div>
+            <div className="class-dossier__weapon">
+              <span>VŨ KHÍ ĐẶC TRƯNG</span>
+              <strong>{activeClass.weapon}</strong>
+            </div>
 
             <div className="skill-list" role="tablist" aria-label={`Kỹ năng class ${activeClass.name}`}>
               {activeClass.skills.map((skill, index) => (
@@ -159,7 +276,37 @@ export function ClassShowcase() {
                   aria-controls="skill-preview-panel"
                   className={activeSkillIndex === index ? 'is-active' : ''}
                   onClick={() => selectSkill(index)}
+                  style={{
+                    paddingLeft: skill.icon ? '58px' : undefined,
+                  }}
                 >
+                  {skill.icon ? (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        left: '12px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        width: '36px',
+                        height: '36px',
+                        display: 'grid',
+                        placeItems: 'center',
+                        borderRadius: '6px',
+                        background: activeSkillIndex === index ? 'var(--wood-950)' : '#e2e7ef',
+                        border: '2px solid var(--wood-950)',
+                        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.4)',
+                      }}
+                    >
+                      <Image
+                        src={skill.icon}
+                        alt={skill.name}
+                        width={28}
+                        height={28}
+                        className="pixelated"
+                        style={{ objectFit: 'contain' }}
+                      />
+                    </span>
+                  ) : null}
                   <span>SKILL 0{index + 1}</span>
                   <strong>{skill.name}</strong>
                   <small>{skill.type}</small>
