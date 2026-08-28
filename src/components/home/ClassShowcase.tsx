@@ -137,6 +137,7 @@ const CHARACTER_CLASSES: CharacterClass[] = [
         description: 'Tung cú đá sấm sét mang theo hỏa lực áp đảo hàng ngũ đối phương.',
         effect: 'cleave',
         icon: '/images/skills/dau-bep/skill-1.png',
+        gif: '/images/skills/dau-bep/skill-1.gif',
       },
       {
         name: 'Knock out',
@@ -144,6 +145,7 @@ const CHARACTER_CLASSES: CharacterClass[] = [
         description: 'Cú đá xoay người dứt điểm với uy lực cực mạnh khiến mục tiêu choáng váng.',
         effect: 'fist',
         icon: '/images/skills/dau-bep/skill-2.png',
+        gif: '/images/skills/dau-bep/skill-2.gif',
       },
       {
         name: 'Thịt băm',
@@ -151,6 +153,7 @@ const CHARACTER_CLASSES: CharacterClass[] = [
         description: 'Chuỗi liên hoàn cước dồn dập vào điểm yếu của kẻ địch không thể chống đỡ.',
         effect: 'finisher',
         icon: '/images/skills/dau-bep/skill-3.png',
+        gif: '/images/skills/dau-bep/skill-3.gif',
       },
     ],
   },
