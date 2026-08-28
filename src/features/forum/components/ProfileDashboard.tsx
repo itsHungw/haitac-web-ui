@@ -1,13 +1,14 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { CircleCheck, Coins, Crosshair, Gem, ShieldAlert, Sparkles, Swords, UserRound, WalletCards } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { Parchment } from '@/components/ui/Parchment';
 import { extractErrorMessage } from '@/lib/api/errors';
 import { forumService } from '../services/forum.service';
-import type { ForumProfile } from '../types/forum.types';
+import { CLASS_PORTRAITS, type ForumProfile } from '../types/forum.types';
 
 const number = new Intl.NumberFormat('vi-VN');
 const money = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
@@ -57,7 +58,13 @@ export function ProfileDashboard() {
       <Parchment className="profile-character-scroll">
         <header className="profile-card-heading"><span>HỒ SƠ NHÂN VẬT</span><h2>{character?.name || 'Chưa tạo nhân vật'}</h2></header>
         <div className="profile-character">
-          <div className={`profile-character__avatar class-${character?.clazz ?? 0}`}><UserRound /></div>
+          <div className={`profile-character__avatar class-${character?.clazz ?? 0}`}>
+            {character && CLASS_PORTRAITS[character.clazz] ? (
+              <Image src={CLASS_PORTRAITS[character.clazz]} fill sizes="118px" alt="" style={{ objectFit: 'cover', objectPosition: 'center 18%' }} />
+            ) : (
+              <UserRound />
+            )}
+          </div>
           {character ? <><div className="profile-character__identity"><span>{character.className}</span><strong>Cấp {character.level}</strong><small>{profile.online ? 'Đang trực tuyến' : 'Đang ngoại tuyến'}</small></div>
           <dl><div><dt><Sparkles /> Kinh nghiệm</dt><dd>{number.format(character.exp)}</dd></div><div><dt><Crosshair /> Tiền truy nã</dt><dd>{number.format(character.wantedPoints)}</dd></div><div><dt><Swords /> Điểm PVP</dt><dd>{number.format(character.pvpPoints)}</dd></div></dl></> : <p>Hãy tạo nhân vật trong game để hồ sơ xuất hiện tại đây.</p>}
         </div>

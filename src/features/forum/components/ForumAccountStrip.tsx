@@ -7,10 +7,9 @@ import { useEffect, useState } from 'react';
 import { authService } from '@/features/auth/services/auth.service';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { forumService } from '../services/forum.service';
-import type { ForumProfile } from '../types/forum.types';
+import { CLASS_PORTRAITS, type ForumProfile } from '../types/forum.types';
 
 const number = new Intl.NumberFormat('vi-VN');
-const CLASS_PORTRAITS = ['/assets/characters/zoro.jpg', '/assets/characters/usop.jpg', '/assets/characters/luffy.jpg', '/assets/characters/sanji.jpg', '/assets/characters/nami.jpg'];
 
 export function ForumAccountStrip() {
   const { user, isLoading } = useAuth();
@@ -30,7 +29,7 @@ export function ForumAccountStrip() {
 
   const character = profile?.character;
   return <div className="forum-account forum-account--member">
-    <div className={`forum-avatar class-${character?.clazz ?? 0}`}>{character ? <Image src={CLASS_PORTRAITS[character.clazz] || CLASS_PORTRAITS[0]} fill sizes="76px" alt="" /> : <UserRound aria-hidden="true" />}</div>
+    <div className={`forum-avatar class-${character?.clazz ?? 0}`}>{character && CLASS_PORTRAITS[character.clazz] ? <Image src={CLASS_PORTRAITS[character.clazz]} fill sizes="76px" alt="" /> : <UserRound aria-hidden="true" />}</div>
     <div className="forum-account__identity">
       <span>THẺ THUYỀN VIÊN · {profile?.online ? 'TRỰC TUYẾN' : 'NGOẠI TUYẾN'}</span>
       <strong>{character?.name || user.user}</strong>

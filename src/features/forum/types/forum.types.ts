@@ -36,3 +36,11 @@ export interface ForumRankings {
   topUp: RankingEntry[];
   level: RankingEntry[];
 }
+
+export const CLASS_PORTRAITS: Record<number, string> = {
+  1: '/assets/characters/luffy.jpg',  // Võ Sĩ
+  2: '/assets/characters/zoro.jpg',   // Kiếm Khách
+  3: '/assets/characters/sanji.jpg',  // Đầu Bếp
+  4: '/assets/characters/nami.jpg',   // Hoa Tiêu
+  5: '/assets/characters/usop.jpg',   // Xạ Thủ
+};
