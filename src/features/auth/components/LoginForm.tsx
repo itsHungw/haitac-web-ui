@@ -36,7 +36,7 @@ export function LoginForm({ onSuccess, onRegisterClick }: LoginFormProps) {
       if (onSuccess) {
         onSuccess(response);
       } else {
-        router.push('/');
+        router.push(response.admin ? '/admin' : '/');
         router.refresh();
       }
     } catch (error) {
