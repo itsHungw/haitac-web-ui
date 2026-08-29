@@ -203,10 +203,13 @@ img.pixelated, .pixel-art { image-rendering: pixelated; image-rendering: crisp-e
   cursor: pointer;
   font-weight: 800;
 }
-.header-link-button { padding: 10px 4px; background: transparent; color: white; font-size: 12px; }
+.header-link-button { min-height: 36px; padding: 8px 10px; display: inline-flex; align-items: center; gap: 6px; border: 2px solid #e06750; background: #9f3027; box-shadow: 2px 2px 0 #041d33; color: #fff4df; font-size: 11px; }
+.header-link-button svg { width: 14px; height: 14px; }
+.header-link-button:hover { background: #c74332; transform: translateY(-1px); }
 .header-admin-link { padding: 8px 9px; border: 1px solid var(--gold-500); color: var(--gold-300); font-family: var(--font-mono); font-size: 9px; font-weight: 700; }
 .header-admin-link:hover { background: var(--gold-500); color: var(--wood-950); }
-.header-register { padding: 9px 12px; background: var(--gold-500); border: 2px solid var(--wood-950); box-shadow: 2px 2px 0 var(--wood-950); color: var(--wood-950); font-size: 12px; }
+.header-register { min-height: 40px; padding: 9px 13px; display: inline-flex; align-items: center; gap: 7px; background: var(--gold-500); border: 2px solid var(--wood-950); box-shadow: 3px 3px 0 var(--wood-950); color: var(--wood-950); font-family: var(--font-mono); font-size: 9px; }
+.header-login svg, .header-register svg { width: 15px; height: 15px; }
 .header-play { padding: 10px 13px; background: var(--red-600); border: 2px solid var(--wood-950); box-shadow: 3px 3px 0 var(--wood-950); color: white; font-family: var(--font-mono); font-size: 12px; font-weight: 700; }
 .header-play:hover, .header-register:hover { filter: brightness(1.1); transform: translateY(-1px); }
 .account-chip { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #b9d8ec; font-family: var(--font-mono); font-size: 9px; }
@@ -222,6 +225,11 @@ img.pixelated, .pixel-art { image-rendering: pixelated; image-rendering: crisp-e
 .mobile-nav nav a[aria-current='page'] { border-color: var(--gold-300); background: #0a4775; box-shadow: inset 0 -4px 0 #032642, 0 0 0 1px var(--red-600); color: white; }
 .mobile-nav__account { margin-top: 14px; display: flex; align-items: center; gap: 8px; color: white; font-size: 13px; }
 .mobile-nav__account button { min-height: 44px; padding: 9px 14px; background: var(--gold-500); border: 2px solid var(--wood-950); color: var(--wood-950); }
+.mobile-nav__account .mobile-nav__login { display: inline-flex; align-items: center; gap: 7px; border-color: #3f7398; background: #0b3c61; color: white; }
+.mobile-nav__account .mobile-nav__register { display: inline-flex; align-items: center; gap: 7px; background: var(--gold-500); color: var(--wood-950); }
+.mobile-nav__login svg, .mobile-nav__register svg { width: 15px; height: 15px; }
+.mobile-nav__account .mobile-nav__logout { display: inline-flex; align-items: center; gap: 7px; background: var(--red-600); color: white; }
+.mobile-nav__logout svg { width: 15px; height: 15px; }
 
 .hero-art { position: relative; width: 100%; aspect-ratio: 3172 / 1344; min-height: 310px; max-height: 640px; overflow: hidden; background: #151744; border-bottom: 0; }
 .hero-art__image { object-fit: cover; object-position: center 46%; }
@@ -484,7 +492,8 @@ img.pixelated, .pixel-art { image-rendering: pixelated; image-rendering: crisp-e
 }
 .brand-crest img { width: 50px; height: 50px; }
 .desktop-nav a[aria-current='page'] { color: white; }
-.header-login { padding: 10px 8px; border: 0; background: transparent; color: white; cursor: pointer; font-size: 12px; font-weight: 800; }
+.header-login { min-height: 40px; padding: 9px 12px; display: inline-flex; align-items: center; gap: 7px; border: 2px solid #4f83a7; background: #0b3c61; box-shadow: 3px 3px 0 #031a2d; color: white; cursor: pointer; font-family: var(--font-mono); font-size: 9px; font-weight: 800; }
+.header-login:hover { border-color: #8bc4e4; background: #11517e; transform: translateY(-1px); }
 .menu-toggle { display: none; margin-left: auto; }
 
 .hero-art { overflow: visible; border-bottom: 5px solid var(--wood-950); }
@@ -1069,8 +1078,13 @@ img.pixelated, .pixel-art { image-rendering: pixelated; image-rendering: crisp-e
 .forum-account--guest strong, .forum-account__identity > strong { display: block; margin-top: 4px; font-size: 20px; }
 .forum-account--guest p, .forum-account__identity p { margin-top: 3px; color: #71553b; font-size: 10px; }
 .forum-account nav { margin-left: auto; display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
-.forum-account nav a, .forum-account nav button { min-height: 39px; padding: 9px 13px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 2px solid #3b2415; background: #fff0c9; color: #3b2415; font-family: var(--font-mono); font-size: 8px; font-weight: 700; cursor: pointer; text-decoration: none; box-shadow: 3px 3px 0 rgba(76,43,20,.24); }
+.forum-account nav a, .forum-account nav button { min-height: 43px; padding: 10px 14px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 2px solid #3b2415; background: #fff0c9; color: #3b2415; font-family: var(--font-mono); font-size: 8px; font-weight: 800; cursor: pointer; text-decoration: none; box-shadow: 3px 3px 0 rgba(76,43,20,.3); transition: filter 140ms ease, transform 140ms ease, box-shadow 140ms ease; }
 .forum-account nav a.is-accent { background: #b43b2b; color: white; }
+.forum-account--guest nav .is-login { min-width: 116px; border-color: #12344d; background: #123f60; color: #f2ead1; }
+.forum-account--guest nav .is-register { min-width: 116px; border-color: #422814; background: #e3a51c; color: #301d12; box-shadow: 3px 3px 0 #79521b; }
+.forum-account nav .is-profile { background: #123f60; color: #f2ead1; }
+.forum-account nav .is-recharge { border-color: #422814; background: #e3a51c; color: #301d12; box-shadow: 3px 3px 0 #79521b; }
+.forum-account nav .is-logout { border-color: #5d211a; background: #a7372a; color: #fff4df; box-shadow: 3px 3px 0 #6a281f; }
 .forum-account nav svg { width: 14px; height: 14px; }
 .forum-avatar { position: relative; z-index: 1; flex: 0 0 78px; width: 78px; height: 82px; display: grid; place-items: center; overflow: hidden; border: 3px solid #3b2415; border-radius: 4px; background: #315d48; color: #fff5d9; box-shadow: inset 0 0 0 4px rgba(255,255,255,.1), 4px 4px 0 rgba(63,38,20,.22); transform: rotate(-1.5deg); }
 .forum-avatar img { object-fit: cover; object-position: center 18%; filter: saturate(.86) contrast(1.04); }
@@ -1078,6 +1092,12 @@ img.pixelated, .pixel-art { image-rendering: pixelated; image-rendering: crisp-e
 .forum-avatar.class-1 { background: #a83a32; }.forum-avatar.class-2 { background: #315d48; }.forum-avatar.class-3 { background: #357ca2; }.forum-avatar.class-4 { background: #ba738d; }.forum-avatar.class-5 { background: #b88a39; }
 .forum-account__identity { position: relative; z-index: 1; min-width: 200px; }
 .forum-account__identity > strong { font-size: 25px; letter-spacing: -.035em; }
+.forum-account__identity > .forum-presence { display: inline-flex; align-items: center; gap: 6px; }
+.forum-presence i { width: 8px; height: 8px; flex: none; border: 1px solid rgba(48,29,18,.58); border-radius: 50%; box-shadow: 0 0 0 2px rgba(255,246,216,.72); }
+.forum-presence.is-online { color: #21694a; }
+.forum-presence.is-online i { background: #2f9e61; box-shadow: 0 0 0 2px rgba(255,246,216,.72), 0 0 7px rgba(47,158,97,.68); }
+.forum-presence.is-offline { color: #9a3d31; }
+.forum-presence.is-offline i { background: #c84235; }
 .forum-account__status { padding-left: 18px; display: grid; gap: 7px; border-left: 1px solid #c09b64; }
 .forum-account__status span, .forum-account__status b { width: fit-content; padding: 5px 7px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid #b58750; background: rgba(255,246,216,.52); font-family: var(--font-mono); font-size: 7px; }
 .forum-account__status svg { width: 14px; height: 14px; }.forum-account__status .is-active { color: #24714f; }.forum-account__status .is-locked { color: #a23c2e; }
@@ -1886,6 +1906,7 @@ img.pixelated, .pixel-art { image-rendering: pixelated; image-rendering: crisp-e
   .forum-account__status { width: 100%; margin-left: 68px; padding: 10px 0 0; grid-template-columns: 1fr 1fr; border-left: 0; border-top: 1px solid #c09b64; }
   .forum-account nav { margin-left: 0; display: grid; grid-template-columns: 1fr 1fr; }
   .forum-account nav a, .forum-account nav button { width: 100%; }
+  .forum-account nav .is-logout { grid-column: 1 / -1; }
   .forum-scroll { filter: none; }
   .forum-scroll__top, .forum-scroll__bottom { margin-inline: 0; border-inline: 0; border-radius: 0; }
   .forum-scroll__middle { padding: 27px 16px 31px; border-inline: 0; }

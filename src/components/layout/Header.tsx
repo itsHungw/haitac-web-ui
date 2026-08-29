@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { LogIn, LogOut, UserPlus } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import type { User } from '@/features/auth/types/auth.types';
@@ -96,12 +97,12 @@ export function Header({ user, isLoading, onOpenLogin, onOpenRegister, onLogout 
               <>
                 <span className="account-chip">THUYỀN TRƯỞNG <strong>{user.user}</strong></span>
                 {user.admin && <Link className="header-admin-link" href="/admin">Quản trị</Link>}
-                <button className="header-link-button" type="button" onClick={onLogout}>Thoát</button>
+                <button className="header-link-button" type="button" onClick={onLogout}><LogOut aria-hidden="true" /> Thoát</button>
               </>
             ) : (
               <>
-                <button className="header-login" type="button" onClick={onOpenLogin}>Đăng nhập</button>
-                <button className="header-register" type="button" onClick={onOpenRegister}>Đăng ký</button>
+                <button className="header-login" type="button" onClick={onOpenLogin}><LogIn aria-hidden="true" /> Đăng nhập</button>
+                <button className="header-register" type="button" onClick={onOpenRegister}><UserPlus aria-hidden="true" /> Đăng ký</button>
               </>
             )}
           </div>
@@ -150,12 +151,12 @@ export function Header({ user, isLoading, onOpenLogin, onOpenRegister, onLogout 
               <>
                 <span>Xin chào, <strong>{user.user}</strong></span>
                 {user.admin && <Link href="/admin" onClick={closeMenu}>Quản trị</Link>}
-                <button type="button" onClick={() => { onLogout(); closeMenu(); }}>Đăng xuất</button>
+                <button className="mobile-nav__logout" type="button" onClick={() => { onLogout(); closeMenu(); }}><LogOut aria-hidden="true" /> Đăng xuất</button>
               </>
             ) : (
               <>
-                <button type="button" onClick={() => { onOpenLogin(); closeMenu(); }}>Đăng nhập</button>
-                <button type="button" onClick={() => { onOpenRegister(); closeMenu(); }}>Đăng ký</button>
+                <button className="mobile-nav__login" type="button" onClick={() => { onOpenLogin(); closeMenu(); }}><LogIn aria-hidden="true" /> Đăng nhập</button>
+                <button className="mobile-nav__register" type="button" onClick={() => { onOpenRegister(); closeMenu(); }}><UserPlus aria-hidden="true" /> Đăng ký</button>
               </>
             )}
           </div>

@@ -2,11 +2,15 @@
 
 import { useState, type ReactNode } from 'react';
 import { AuthModal } from '@/features/auth/components/AuthModal';
-import { useAuth } from '@/features/auth/hooks/useAuth';
+import { AuthProvider, useAuth } from '@/features/auth/hooks/useAuth';
 import { Footer } from './Footer';
 import { Header } from './Header';
 
 export function PublicPageShell({ children }: { children: ReactNode }) {
+  return <AuthProvider><PublicPageContent>{children}</PublicPageContent></AuthProvider>;
+}
+
+function PublicPageContent({ children }: { children: ReactNode }) {
   const { user, isLoading, logout, refreshUser } = useAuth();
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalTab, setAuthModalTab] = useState<'login' | 'register'>('login');

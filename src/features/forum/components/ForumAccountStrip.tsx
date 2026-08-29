@@ -2,9 +2,8 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { CircleCheck, CircleDollarSign, LogOut, ShieldAlert, UserRound } from 'lucide-react';
+import { CircleCheck, CircleDollarSign, LogIn, LogOut, ShieldAlert, UserPlus, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { authService } from '@/features/auth/services/auth.service';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { forumService } from '../services/forum.service';
 import { CLASS_PORTRAITS, type ForumProfile } from '../types/forum.types';
@@ -12,26 +11,32 @@ import { CLASS_PORTRAITS, type ForumProfile } from '../types/forum.types';
 const number = new Intl.NumberFormat('vi-VN');
 
 export function ForumAccountStrip() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, logout } = useAuth();
   const [profile, setProfile] = useState<ForumProfile | null>(null);
 
   useEffect(() => {
-    if (user) forumService.getProfile().then(setProfile).catch(() => undefined);
-    else setProfile(null);
+    let cancelled = false;
+    setProfile(null);
+    if (user) {
+      forumService.getProfile()
+        .then((nextProfile) => { if (!cancelled) setProfile(nextProfile); })
+        .catch(() => undefined);
+    }
+    return () => { cancelled = true; };
   }, [user]);
 
   if (isLoading) return <div className="forum-account forum-account--loading"><span /><span /></div>;
 
   if (!user) return <div className="forum-account forum-account--guest">
     <div><span>CỔNG THUYỀN TRƯỞNG</span><strong>Gia nhập cuộc trò chuyện</strong><p>Đăng nhập để viết bài và quản lý nhân vật.</p></div>
-    <nav><Link href="/login">Đăng nhập</Link><Link href="/register">Đăng ký</Link></nav>
+    <nav><Link className="is-login" href="/login"><LogIn aria-hidden="true" /> Đăng nhập</Link><Link className="is-register" href="/register"><UserPlus aria-hidden="true" /> Đăng ký</Link></nav>
   </div>;
 
   const character = profile?.character;
   return <div className="forum-account forum-account--member">
     <div className={`forum-avatar class-${character?.clazz ?? 0}`}>{character && CLASS_PORTRAITS[character.clazz] ? <Image src={CLASS_PORTRAITS[character.clazz]} fill sizes="76px" alt="" /> : <UserRound aria-hidden="true" />}</div>
     <div className="forum-account__identity">
-      <span>THẺ THUYỀN VIÊN · {profile?.online ? 'TRỰC TUYẾN' : 'NGOẠI TUYẾN'}</span>
+      <span className={`forum-presence ${profile?.online ? 'is-online' : 'is-offline'}`}><i aria-hidden="true" /> THẺ THUYỀN VIÊN · {profile?.online ? 'ONLINE' : 'OFFLINE'}</span>
       <strong>{character?.name || user.user}</strong>
       <p>{character ? `${character.className} · Cấp ${character.level}` : `Tài khoản ${user.user} · Chưa tạo nhân vật`}</p>
     </div>
@@ -40,10 +45,10 @@ export function ForumAccountStrip() {
       <b><CircleDollarSign /> {number.format(profile?.coin ?? 0)} Coin</b>
     </div>
     <nav>
-      <Link href="/profile">Hồ sơ</Link>
+      <Link className="forum-account-action is-profile" href="/profile"><UserRound aria-hidden="true" /> Hồ sơ</Link>
       {!profile?.activated && <Link className="is-accent" href="/profile#kich-hoat">Kích hoạt</Link>}
-      <Link href="/nap-the">Nạp Coin</Link>
-      <button type="button" onClick={async () => { await authService.logout().catch(() => undefined); window.location.reload(); }}><LogOut /> Thoát</button>
+      <Link className="forum-account-action is-recharge" href="/nap-the"><CircleDollarSign aria-hidden="true" /> Nạp Coin</Link>
+      <button className="forum-account-action is-logout" type="button" onClick={() => { void logout(); }}><LogOut aria-hidden="true" /> Thoát</button>
     </nav>
   </div>;
 }

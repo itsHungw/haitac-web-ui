@@ -22,8 +22,19 @@ export function ProfileDashboard() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    if (!user) { setLoadingProfile(false); return; }
-    forumService.getProfile().then(setProfile).catch((error) => setMessage(extractErrorMessage(error))).finally(() => setLoadingProfile(false));
+    let cancelled = false;
+    setProfile(null);
+    setMessage('');
+    if (!user) {
+      setLoadingProfile(false);
+      return () => { cancelled = true; };
+    }
+    setLoadingProfile(true);
+    forumService.getProfile()
+      .then((nextProfile) => { if (!cancelled) setProfile(nextProfile); })
+      .catch((error) => { if (!cancelled) setMessage(extractErrorMessage(error)); })
+      .finally(() => { if (!cancelled) setLoadingProfile(false); });
+    return () => { cancelled = true; };
   }, [user]);
 
   const nextMilestone = useMemo(() => MILESTONES.find((value) => value > (profile?.totalTopUp ?? 0)), [profile?.totalTopUp]);
