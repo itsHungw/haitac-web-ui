@@ -1,301 +1,246 @@
 'use client';
 
-import { useState } from 'react';
+import Link from 'next/link';
+import { QRCodeSVG } from 'qrcode.react';
+import {
+  BadgeCheck, Check, Clock3, Coins, Copy, Landmark, LoaderCircle, LockKeyhole,
+  QrCode, RefreshCcw, ShieldCheck, TriangleAlert,
+} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { paymentService } from '@/features/payment/services/payment.service';
+import type { PaymentConfig, PaymentOrder } from '@/features/payment/types/payment.types';
+import { extractErrorMessage } from '@/lib/api/errors';
 
-interface DenomOption {
-  value: number;
-  label: string;
-  coin: number;
+const number = new Intl.NumberFormat('vi-VN');
+const money = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
+const PRESETS = [10_000, 20_000, 50_000, 100_000, 200_000, 500_000, 1_000_000, 2_000_000, 5_000_000, 10_000_000];
+
+function countdown(expiresAt: string, now: number) {
+  const remaining = Math.max(0, Math.ceil((new Date(expiresAt).getTime() - now) / 1000));
+  return `${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`;
 }
 
-const TELCOS = [
-  { id: 'VIETTEL', label: 'Viettel' },
-  { id: 'VINAPHONE', label: 'VinaPhone' },
-  { id: 'MOBIFONE', label: 'MobiFone' },
-  { id: 'ZING', label: 'Thẻ Zing' },
-  { id: 'GATE', label: 'Thẻ Gate' },
-];
-
-const DENOMS: DenomOption[] = [
-  { value: 10000, label: '10.000 đ', coin: 10000 },
-  { value: 20000, label: '20.000 đ', coin: 20000 },
-  { value: 50000, label: '50.000 đ', coin: 50000 },
-  { value: 100000, label: '100.000 đ', coin: 100000 },
-  { value: 200000, label: '200.000 đ', coin: 200000 },
-  { value: 500000, label: '500.000 đ', coin: 500000 },
-  { value: 1000000, label: '1.000.000 đ', coin: 1000000 },
-];
-
 export function RechargeForm() {
-  const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'bank' | 'momo' | 'card'>('bank');
-  const [selectedTelco, setSelectedTelco] = useState('VIETTEL');
-  const [selectedDenom, setSelectedDenom] = useState<DenomOption>(DENOMS[3]); // 100k
-  const [username, setUsername] = useState(user?.user || '');
-  const [serial, setSerial] = useState('');
-  const [pin, setPin] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const { user, isLoading: authLoading } = useAuth();
+  const [config, setConfig] = useState<PaymentConfig | null>(null);
+  const [amount, setAmount] = useState('100000');
+  const [order, setOrder] = useState<PaymentOrder | null>(null);
+  const [loadingConfig, setLoadingConfig] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState<'account' | 'content' | null>(null);
+  const [now, setNow] = useState(Date.now());
+  const pendingOrderStorageKey = user ? `htth:pending-payment:${user.user}` : '';
 
-  const handleSubmitCard = (e: React.FormEvent) => {
-    e.preventDefault();
-    const accountName = username.trim() || user?.user;
-    if (!accountName) {
-      setStatusMessage({ type: 'error', text: 'Vui lòng nhập tên tài khoản nhận Coin.' });
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setLoadingConfig(false);
       return;
     }
-    if (!serial.trim() || !pin.trim()) {
-      setStatusMessage({ type: 'error', text: 'Vui lòng nhập đầy đủ Số Seri và Mã Thẻ PIN.' });
-      return;
-    }
+    let cancelled = false;
+    setLoadingConfig(true);
+    paymentService.getConfig()
+      .then(async (next) => {
+        if (cancelled) return;
+        setConfig(next);
+        setAmount(String(Math.max(next.minAmountVnd, 100_000)));
+        const savedOrderId = window.localStorage.getItem(`htth:pending-payment:${user.user}`);
+        if (savedOrderId) {
+          try {
+            const savedOrder = await paymentService.getOrder(savedOrderId);
+            if (!cancelled) setOrder(savedOrder);
+            if (savedOrder.status !== 'PENDING') {
+              window.localStorage.removeItem(`htth:pending-payment:${user.user}`);
+            }
+          } catch {
+            window.localStorage.removeItem(`htth:pending-payment:${user.user}`);
+          }
+        }
+      })
+      .catch((reason) => { if (!cancelled) setError(extractErrorMessage(reason)); })
+      .finally(() => { if (!cancelled) setLoadingConfig(false); });
+    return () => { cancelled = true; };
+  }, [authLoading, user]);
 
-    setIsSubmitting(true);
-    setStatusMessage(null);
+  useEffect(() => {
+    if (!order || order.status !== 'PENDING') return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const next = await paymentService.getOrder(order.publicId);
+        if (!cancelled) {
+          setOrder(next);
+          if (next.status !== 'PENDING' && pendingOrderStorageKey) {
+            window.localStorage.removeItem(pendingOrderStorageKey);
+          }
+        }
+      } catch {
+        // Giữ QR hiện tại khi mạng chập chờn; lần polling sau sẽ tự thử lại.
+      }
+    };
+    const interval = window.setInterval(() => { void poll(); }, 3_000);
+    return () => { cancelled = true; window.clearInterval(interval); };
+  }, [order?.publicId, order?.status, pendingOrderStorageKey]);
 
-    // Simulate recharge request
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setStatusMessage({
-        type: 'success',
-        text: `Đã gửi thẻ ${selectedTelco} mệnh giá ${selectedDenom.label} cho tài khoản "${accountName}". Coin sẽ được cộng sau khi đối tác xác nhận thẻ.`,
-      });
-      setSerial('');
-      setPin('');
-    }, 900);
-  };
+  useEffect(() => {
+    if (!order || order.status !== 'PENDING') return;
+    const interval = window.setInterval(() => setNow(Date.now()), 1_000);
+    return () => window.clearInterval(interval);
+  }, [order?.publicId, order?.status]);
 
-  return (
-    <div className="recharge-layout">
-      <div className="recharge-box">
-        <div className="recharge-tabs">
-          <button
-            type="button"
-            className={`recharge-tab ${activeTab === 'bank' ? 'is-active' : ''}`}
-            onClick={() => setActiveTab('bank')}
-          >
-            🏦 CHUYỂN KHOẢN QR
-          </button>
-          <button
-            type="button"
-            className={`recharge-tab ${activeTab === 'momo' ? 'is-active' : ''}`}
-            onClick={() => setActiveTab('momo')}
-          >
-            📱 VÍ MOMO
-          </button>
-          <button
-            type="button"
-            className={`recharge-tab ${activeTab === 'card' ? 'is-active' : ''}`}
-            onClick={() => setActiveTab('card')}
-          >
-            💳 THẺ CÀO
-          </button>
-        </div>
-
-        <div className="recharge-card-body">
-          {activeTab === 'card' && (
-            <form className="recharge-form" onSubmit={handleSubmitCard}>
-              <div className="form-row">
-                <label>1. Chọn loại thẻ cào</label>
-                <div className="telco-selector">
-                  {TELCOS.map((telco) => (
-                    <button
-                      key={telco.id}
-                      type="button"
-                      className={`telco-btn ${selectedTelco === telco.id ? 'is-selected' : ''}`}
-                      onClick={() => setSelectedTelco(telco.id)}
-                    >
-                      {telco.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="form-row">
-                <label>2. Chọn mệnh giá</label>
-                <div className="denom-grid">
-                  {DENOMS.map((d) => (
-                    <button
-                      key={d.value}
-                      type="button"
-                      className={`denom-btn ${selectedDenom.value === d.value ? 'is-selected' : ''}`}
-                      onClick={() => setSelectedDenom(d)}
-                    >
-                      <strong>{d.label}</strong>
-                      <small>{d.coin.toLocaleString('vi-VN')} Coin</small>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="form-row">
-                <label htmlFor="rec-username">3. Tên tài khoản nhận Coin</label>
-                <input
-                  id="rec-username"
-                  type="text"
-                  placeholder="Nhập tên đăng nhập nhân vật"
-                  value={username || user?.user || ''}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="form-row">
-                <label htmlFor="rec-serial">4. Số Seri</label>
-                <input
-                  id="rec-serial"
-                  type="text"
-                  placeholder="Nhập số seri in trên thẻ"
-                  value={serial}
-                  onChange={(e) => setSerial(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="form-row">
-                <label htmlFor="rec-pin">5. Mã thẻ (Mã PIN)</label>
-                <input
-                  id="rec-pin"
-                  type="password"
-                  placeholder="Nhập mã cào dưới lớp tráng bạc"
-                  value={pin}
-                  onChange={(e) => setPin(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="recharge-summary-box">
-                <span>Coin dự kiến sau khi thẻ được xác nhận:</span>
-                <strong>{selectedDenom.coin.toLocaleString('vi-VN')} COIN</strong>
-              </div>
-
-              {statusMessage && (
-                <div
-                  style={{
-                    padding: '12px 14px',
-                    border: '2px solid',
-                    borderColor: statusMessage.type === 'success' ? '#2e7d32' : '#c62828',
-                    backgroundColor: statusMessage.type === 'success' ? '#e8f5e9' : '#ffebee',
-                    color: statusMessage.type === 'success' ? '#1b5e20' : '#b71c1c',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                  }}
-                >
-                  {statusMessage.text}
-                </div>
-              )}
-
-              <button type="submit" className="recharge-submit-btn" disabled={isSubmitting}>
-                {isSubmitting ? 'ĐANG XỬ LÝ...' : 'XÁC NHẬN NẠP THẺ'}
-              </button>
-            </form>
-          )}
-
-          {activeTab === 'bank' && (
-            <div className="bank-transfer-details">
-              <div className="bank-qr-card">
-                <div className="bank-qr-mock">
-                  <span style={{ fontSize: '28px', marginBottom: '4px' }}>📱</span>
-                  <strong>VIETQR 24/7</strong>
-                  <span>Kênh nạp ưu tiên</span>
-                </div>
-                <div className="bank-info-lines">
-                  <p>Ngân hàng: <strong>MB BANK (Quân Đội)</strong></p>
-                  <p>Số tài khoản: <strong>999988886666</strong></p>
-                  <p>Chủ tài khoản: <strong>HAI TAC TI HON</strong></p>
-                  <p>
-                    Cú pháp: <strong>HTTH {user?.user || 'TENTAIKHOAN'}</strong>
-                  </p>
-                  <p style={{ color: '#c62828', fontSize: '11px' }}>
-                    * Ghi đúng nội dung để Coin được cộng vào đúng tài khoản sau khi giao dịch được xác nhận.
-                  </p>
-                </div>
-              </div>
-              <div className="recharge-summary-box">
-                <span>Chuyển khoản ngân hàng:</span>
-                <strong>1 VNĐ = 1 COIN</strong>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'momo' && (
-            <div className="bank-transfer-details">
-              <div className="bank-qr-card">
-                <div className="bank-qr-mock" style={{ background: '#fdf2f8', borderColor: '#be185d' }}>
-                  <span style={{ fontSize: '28px', marginBottom: '4px' }}>💖</span>
-                  <strong style={{ color: '#be185d' }}>MOMO PAY</strong>
-                  <span>Nạp Coin bằng ví</span>
-                </div>
-                <div className="bank-info-lines">
-                  <p>Ví điện tử: <strong>MoMo</strong></p>
-                  <p>Số điện thoại ví: <strong>0988 888 888</strong></p>
-                  <p>Tên người nhận: <strong>HAI TAC TI HON</strong></p>
-                  <p>
-                    Lời nhắn: <strong>HTTH {user?.user || 'TENTAIKHOAN'}</strong>
-                  </p>
-                  <p style={{ color: '#be185d', fontSize: '11px' }}>
-                    * Ghi đúng lời nhắn để Coin được cộng vào đúng tài khoản sau khi giao dịch được xác nhận.
-                  </p>
-                </div>
-              </div>
-              <div className="recharge-summary-box">
-                <span>Nạp qua Ví MoMo:</span>
-                <strong>1 VNĐ = 1 COIN</strong>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <aside className="recharge-sidebar-box">
-        <div className="rate-card">
-          <div className="rate-card__head">
-            <h3>BẢNG NẠP COIN</h3>
-            <span>CHUYỂN KHOẢN / VÍ</span>
-          </div>
-          <div className="rate-card__body">
-            <table className="rate-table">
-              <thead>
-                <tr>
-                  <th>Mệnh giá</th>
-                  <th>Coin nhận</th>
-                </tr>
-              </thead>
-              <tbody>
-                {DENOMS.map((d) => (
-                  <tr key={d.value}>
-                    <td>{d.label}</td>
-                    <td>{d.coin.toLocaleString('vi-VN')}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="rate-card">
-          <div className="rate-card__head">
-            <h3>COIN DÙNG ĐỂ LÀM GÌ?</h3>
-            <span>NPC NAMI</span>
-          </div>
-          <div className="rate-card__body">
-            <ul className="coin-use-list">
-              <li>
-                <strong>Mở thành viên:</strong> 10.000 Coin để mở giao dịch, chợ và chat thế giới.
-              </li>
-              <li>
-                <strong>Đổi Ruby:</strong> 10 Coin nhận 2 Ruby tại NPC Nami.
-              </li>
-              <li>
-                <strong>Đổi Beri:</strong> 1 Coin nhận 5.000 Beri tại NPC Nami.
-              </li>
-              <li>
-                <strong>Đổi Extol:</strong> 1.000 Ruby nhận 750.000 Extol tại NPC Nami.
-              </li>
-            </ul>
-          </div>
-        </div>
-      </aside>
-    </div>
+  const parsedAmount = Number(amount);
+  const selectablePresets = useMemo(
+    () => config ? PRESETS.filter((value) => value >= config.minAmountVnd && value <= config.maxAmountVnd) : PRESETS,
+    [config],
   );
+  const validAmount = Boolean(config)
+    && Number.isSafeInteger(parsedAmount)
+    && parsedAmount >= config!.minAmountVnd
+    && parsedAmount <= config!.maxAmountVnd
+    && parsedAmount % config!.amountStepVnd === 0;
+
+  async function createOrder() {
+    if (!validAmount || creating) return;
+    setCreating(true);
+    setError('');
+    try {
+      const next = await paymentService.createOrder(parsedAmount);
+      setOrder(next);
+      if (pendingOrderStorageKey) window.localStorage.setItem(pendingOrderStorageKey, next.publicId);
+      setNow(Date.now());
+    } catch (reason) {
+      setError(extractErrorMessage(reason));
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function copy(value: string, field: 'account' | 'content') {
+    await navigator.clipboard.writeText(value);
+    setCopied(field);
+    window.setTimeout(() => setCopied(null), 1_500);
+  }
+
+  if (authLoading || loadingConfig) {
+    return <div className="payment-loading" aria-label="Đang tải cổng nạp"><LoaderCircle aria-hidden="true" /><span>Đang kết nối cổng nạp an toàn…</span></div>;
+  }
+
+  if (!user) {
+    return <section className="payment-gate">
+      <LockKeyhole aria-hidden="true" />
+      <span>TÀI KHOẢN BẮT BUỘC</span>
+      <h2>Đăng nhập trước khi tạo QR</h2>
+      <p>Coin được cộng thẳng vào tài khoản đang đăng nhập, không cần chọn nhân vật.</p>
+      <Link href="/login">Đăng nhập để nạp Coin</Link>
+    </section>;
+  }
+
+  if (!config) {
+    return <section className="payment-gate is-unavailable">
+      <TriangleAlert aria-hidden="true" />
+      <span>KHÔNG TẢI ĐƯỢC CỔNG NẠP</span>
+      <h2>Chưa thể lấy cấu hình payOS</h2>
+      <p>{error || 'Vui lòng tải lại trang hoặc quay lại sau.'}</p>
+    </section>;
+  }
+
+  if (!config.enabled && !order) {
+    return <section className="payment-gate is-unavailable">
+      <TriangleAlert aria-hidden="true" />
+      <span>PAYOS CHƯA SẴN SÀNG</span>
+      <h2>Kênh nạp đang được cấu hình</h2>
+      <p>{error || 'Quản trị viên cần tạo Kênh thanh toán payOS và xác nhận webhook trước khi nhận giao dịch thật.'}</p>
+    </section>;
+  }
+
+  return <div className="payment-layout">
+    <section className="payment-main">
+      {!order && <>
+        <header className="payment-heading">
+          <span><QrCode aria-hidden="true" /> VIETQR TỰ ĐỘNG 24/7</span>
+          <h2>Chọn số Coin muốn nạp</h2>
+          <p>Đơn thuộc tài khoản <strong>{user.user}</strong>. Tiền chuyển thẳng vào ngân hàng của máy chủ.</p>
+        </header>
+
+        <div className="payment-presets" aria-label="Mệnh giá nạp nhanh">
+          {selectablePresets.map((value) => <button
+            className={parsedAmount === value ? 'is-selected' : ''}
+            key={value}
+            onClick={() => setAmount(String(value))}
+            type="button"
+          ><strong>{value >= 1_000_000 ? `${value / 1_000_000} triệu` : `${number.format(value / 1_000)}K`}</strong><small>{number.format(value * config.coinPerVnd)} Coin</small></button>)}
+        </div>
+
+        <label className="payment-custom-amount" htmlFor="payment-amount">
+          <span>SỐ TIỀN KHÁC</span>
+          <div><input
+            id="payment-amount"
+            inputMode="numeric"
+            min={config.minAmountVnd}
+            max={config.maxAmountVnd}
+            step={config.amountStepVnd}
+            value={amount}
+            onChange={(event) => setAmount(event.target.value.replace(/\D/g, ''))}
+          /><b>VNĐ</b></div>
+          <small>Từ {money.format(config.minAmountVnd)} đến {money.format(config.maxAmountVnd)}, bước {money.format(config.amountStepVnd)}.</small>
+        </label>
+
+        <div className="payment-order-summary">
+          <div><span>Bạn chuyển</span><strong>{Number.isFinite(parsedAmount) ? money.format(parsedAmount) : '—'}</strong></div>
+          <i aria-hidden="true">→</i>
+          <div><span>Tài khoản nhận</span><strong>{validAmount ? `${number.format(parsedAmount * config.coinPerVnd)} Coin` : '—'}</strong></div>
+        </div>
+        {error && <p className="payment-error" role="alert">{error}</p>}
+        <button className="payment-create-button" disabled={!validAmount || creating} onClick={() => { void createOrder(); }} type="button">
+          {creating ? <><LoaderCircle className="is-spinning" /> Đang tạo QR…</> : <><QrCode /> Tạo mã VietQR</>}
+        </button>
+      </>}
+
+      {order?.status === 'PENDING' && <div className="payment-pending">
+        <header><div><span>ĐƠN NẠP ĐANG CHỜ</span><h2>Quét QR để hoàn tất</h2></div><time><Clock3 /> {countdown(order.expiresAt, now)}</time></header>
+        <div className="payment-qr-stage">
+          <div className="payment-qr-frame"><QRCodeSVG value={order.qrCode} size={320} level="M" marginSize={4} title={`Mã VietQR cho đơn ${order.publicId}`} /></div>
+          <div className="payment-bank-details">
+            <span><Landmark /> {order.bankCode}</span>
+            <h3>{order.bankAccountName}</h3>
+            <dl>
+              <div><dt>Số tài khoản</dt><dd>{order.bankAccount}<button type="button" aria-label="Sao chép số tài khoản" onClick={() => { void copy(order.bankAccount, 'account'); }}>{copied === 'account' ? <Check /> : <Copy />}</button></dd></div>
+              <div><dt>Số tiền chính xác</dt><dd>{money.format(order.amountVnd)}</dd></div>
+              <div className="is-content"><dt>Nội dung bắt buộc</dt><dd>{order.transferContent}<button type="button" aria-label="Sao chép nội dung chuyển khoản" onClick={() => { void copy(order.transferContent, 'content'); }}>{copied === 'content' ? <Check /> : <Copy />}</button></dd></div>
+            </dl>
+            <p><TriangleAlert /> Không sửa số tiền hoặc nội dung. Hệ thống chỉ cộng Coin khi khớp hoàn toàn.</p>
+          </div>
+        </div>
+        <div className="payment-waiting"><span /><div><strong>Đang chờ ngân hàng xác nhận</strong><small>Trang tự kiểm tra mỗi 3 giây, bạn không cần tải lại.</small></div></div>
+        <button className="payment-secondary-button" type="button" onClick={() => { if (pendingOrderStorageKey) window.localStorage.removeItem(pendingOrderStorageKey); setOrder(null); }}>Tạo đơn khác</button>
+      </div>}
+
+      {order?.status === 'PAID' && <div className="payment-result is-paid">
+        <BadgeCheck aria-hidden="true" /><span>GIAO DỊCH THÀNH CÔNG</span><h2>Đã cộng {number.format(order.expectedCoin)} Coin</h2>
+        <p>Coin đã vào tài khoản <strong>{user.user}</strong>{order.coinBalance !== null ? ` · Số dư mới ${number.format(order.coinBalance)} Coin` : ''}.</p>
+        <div><Link href="/profile">Xem hồ sơ</Link><button type="button" onClick={() => { if (pendingOrderStorageKey) window.localStorage.removeItem(pendingOrderStorageKey); setOrder(null); }}>Nạp thêm</button></div>
+      </div>}
+
+      {order && ['EXPIRED', 'CANCELLED'].includes(order.status) && <div className="payment-result is-expired">
+        <Clock3 aria-hidden="true" /><span>ĐƠN ĐÃ HẾT HẠN</span><h2>Tạo QR mới để tiếp tục</h2>
+        <p>Không chuyển tiền bằng QR cũ. Giao dịch đến muộn sẽ được đưa vào đối soát thủ công.</p>
+        <button type="button" onClick={() => { if (pendingOrderStorageKey) window.localStorage.removeItem(pendingOrderStorageKey); setOrder(null); }}><RefreshCcw /> Tạo đơn mới</button>
+      </div>}
+
+      {order?.status === 'REVIEW' && <div className="payment-result is-review">
+        <TriangleAlert aria-hidden="true" /><span>ĐANG ĐỐI SOÁT</span><h2>Giao dịch chưa khớp hoàn toàn</h2>
+        <p>Hệ thống đã ghi nhận tiền vào nhưng số tiền hoặc thông tin đơn chưa đúng. Quản trị viên sẽ kiểm tra, không cần chuyển thêm.</p>
+      </div>}
+    </section>
+
+    <aside className="payment-assurance">
+      <span>LUỒNG TIỀN MINH BẠCH</span>
+      <h3>Tiền vào thẳng ngân hàng</h3>
+      <ol><li><b>01</b><div><strong>Tạo đơn riêng</strong><small>Mỗi QR có mã không trùng.</small></div></li><li><b>02</b><div><strong>Chuyển khoản VietQR</strong><small>Tiền vào thẳng ngân hàng.</small></div></li><li><b>03</b><div><strong>payOS xác nhận</strong><small>Webhook được kiểm tra chữ ký.</small></div></li><li><b>04</b><div><strong>Coin được cộng</strong><small>Một giao dịch chỉ được cộng một lần.</small></div></li></ol>
+      <div className="payment-security-note"><ShieldCheck /><p><strong>Bảo vệ tự động</strong><br />Đúng tài khoản nhận · đúng số tiền · đúng mã đơn.</p></div>
+      <div className="payment-rate-note"><Coins /><p><span>TỶ LỆ HIỆN TẠI</span><strong>1 VNĐ = {config.coinPerVnd} Coin</strong></p></div>
+    </aside>
+  </div>;
 }

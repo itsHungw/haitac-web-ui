@@ -5,7 +5,7 @@ import { Parchment } from '@/components/ui/Parchment';
 
 export const metadata = {
   title: 'Nạp Coin - Hải Tặc Tí Hon',
-  description: 'Nạp Coin qua chuyển khoản ngân hàng, ví điện tử hoặc thẻ cào để sử dụng trong Hải Tặc Tí Hon.',
+  description: 'Nạp Coin tự động 24/7 qua chuyển khoản VietQR và payOS.',
 };
 
 export default function RechargePage() {
@@ -21,9 +21,9 @@ export default function RechargePage() {
           <div className="page-width">
             <Parchment className="recharge-scroll">
               <div className="recharge-banner-note">
-                <span>CHUYỂN KHOẢN LÀ KÊNH ƯU TIÊN</span>
-                <strong>NẠP TIỀN NHẬN COIN · TỰ CHỌN CÁCH QUY ĐỔI TRONG GAME</strong>
-                <p>Thẻ cào được đặt ở kênh dự phòng do chiết khấu đối tác cao.</p>
+                <span>MỘT KÊNH NẠP DUY NHẤT</span>
+                <strong>VIETQR 24/7 · TIỀN VÀO THẲNG NGÂN HÀNG</strong>
+                <p>payOS tự xác nhận và Coin được cộng vào tài khoản đang đăng nhập.</p>
               </div>
               <RechargeForm />
             </Parchment>
