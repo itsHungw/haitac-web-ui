@@ -56,11 +56,11 @@ export function NewsSection() {
           <span className="captain-board__pin" aria-hidden="true" />
           <p className="eyebrow eyebrow--dark">HÀNH TRANG NHANH</p>
           <h3>Sẵn sàng ra khơi?</h3>
-          <p>Tải game, ghé diễn đàn hoặc bổ sung ruby qua các kênh chính thức.</p>
+          <p>Tải game, ghé diễn đàn hoặc bổ sung Coin qua các kênh chính thức.</p>
           <div className="captain-board__links">
             <a href="/tai-game"><span>01</span>Tải game</a>
             <a href="https://haitactihon.com/forum" target="_blank" rel="noopener noreferrer"><span>02</span>Diễn đàn</a>
-            <a href="https://pay.teamobi.com/?game=ht" target="_blank" rel="noopener noreferrer"><span>03</span>Nạp ruby</a>
+            <a href="/nap-the"><span>03</span>Nạp Coin</a>
           </div>
         </aside>
       </div>

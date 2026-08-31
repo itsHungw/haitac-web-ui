@@ -78,9 +78,9 @@ export function AdminDashboard() {
             <div><span>KẾT NỐI</span><h2>Trạng thái nguồn dữ liệu</h2></div>
           </div>
           <dl>
-            <div><dt><i className="is-ok" />Web API</dt><dd>Phản hồi</dd></div>
-            <div><dt><i className="is-ok" />MySQL</dt><dd>Đã truy vấn</dd></div>
-            <div><dt><i className="is-ok" />Game server</dt><dd>Queue có ACK</dd></div>
+            <div><dt><i className="is-ok" />Admin API</dt><dd>Phản hồi</dd></div>
+            <div><dt><i className="is-ok" />Dữ liệu tài khoản</dt><dd>Đã tạo snapshot</dd></div>
+            <div><dt><i className="is-wait" />Game server</dt><dd>Kiểm tra tại Live ops</dd></div>
           </dl>
           <p className="admin-system-time">
             Snapshot: {overview ? dateFormatter.format(new Date(overview.generatedAt)) : 'đang tải'}

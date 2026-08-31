@@ -38,6 +38,7 @@ interface AdminContextValue {
   overview: AdminOverview | null;
   isLoading: boolean;
   refreshOverview: () => Promise<void>;
+  handleAdminError: (caught: unknown) => boolean;
 }
 
 const AdminContext = createContext<AdminContextValue | null>(null);
@@ -51,6 +52,7 @@ export function useAdminWorkspace() {
 interface AdminNavItem {
   href: string;
   label: string;
+  mobileLabel?: string;
   icon: IconName;
   disabled?: boolean;
 }
@@ -61,11 +63,11 @@ const NAVIGATION: Array<{ label: string; items: AdminNavItem[] }> = [
     items: [
       { href: '/admin', label: 'Tổng quan', icon: 'dashboard' as const },
       { href: '/admin/users', label: 'Người chơi', icon: 'users' as const },
-      { href: '/admin/fashion', label: 'Cải trang & Sự kiện', icon: 'fashion' as const },
+      { href: '/admin/fashion', label: 'Cải trang & Sự kiện', mobileLabel: 'Cải trang', icon: 'fashion' as const },
       { href: '/admin/economy', label: 'Kinh tế game', icon: 'economy' as const },
       { href: '/admin/gift-codes', label: 'Gift code', icon: 'gift' as const },
-      { href: '/admin/live-operations', label: 'Live ops', icon: 'broadcast' as const },
-      { href: '/admin/audit', label: 'Nhật ký quản trị', icon: 'audit' as const },
+      { href: '/admin/live-operations', label: 'Live ops', mobileLabel: 'Live ops', icon: 'broadcast' as const },
+      { href: '/admin/audit', label: 'Nhật ký quản trị', mobileLabel: 'Audit', icon: 'audit' as const },
     ],
   },
 ];
@@ -79,6 +81,18 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [accessDenied, setAccessDenied] = useState(false);
   const [globalQuery, setGlobalQuery] = useState('');
 
+  const handleAdminError = useCallback((caught: unknown) => {
+    if (caught instanceof ApiError && caught.status === 401) {
+      router.replace('/login');
+      return true;
+    }
+    if (caught instanceof ApiError && caught.status === 403) {
+      setAccessDenied(true);
+      return true;
+    }
+    return false;
+  }, [router]);
+
   const refreshOverview = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -86,14 +100,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
       setOverview(await adminService.getOverview());
       setAccessDenied(false);
     } catch (caught) {
-      if (caught instanceof ApiError && caught.status === 401) {
-        router.replace('/login');
-        return;
-      }
-      if (caught instanceof ApiError && caught.status === 403) {
-        setAccessDenied(true);
-        return;
-      }
+      if (handleAdminError(caught)) return;
       if (caught instanceof ApiError && caught.status === 404) {
         setError('API quản trị chưa được triển khai trên máy chủ đang kết nối.');
         return;
@@ -102,11 +109,16 @@ export function AdminShell({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [router]);
+  }, [handleAdminError]);
 
   useEffect(() => {
     void refreshOverview();
   }, [refreshOverview]);
+
+  useEffect(() => {
+    const activeItem = document.querySelector<HTMLElement>('.admin-nav-item.is-active');
+    activeItem?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }, [pathname]);
 
   function handleGlobalSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -135,8 +147,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AdminContext.Provider value={{ overview, isLoading, refreshOverview }}>
+    <AdminContext.Provider value={{ overview, isLoading, refreshOverview, handleAdminError }}>
       <div className="admin-app">
+        <a className="admin-skip-link" href="#admin-main">Bỏ qua điều hướng</a>
         <header className="admin-header">
           <Link className="admin-wordmark" href="/admin">
             <Image src="/images/logo.png" width={45} height={45} alt="" className="pixelated" />
@@ -175,8 +188,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
                       <Icon name={item.icon} /><b>{item.label}</b><small>Sau</small>
                     </span>
                   ) : (
-                    <Link className={`admin-nav-item ${active ? 'is-active' : ''}`} href={item.href} key={item.label}>
-                      <Icon name={item.icon} /><b>{item.label}</b>
+                    <Link
+                      aria-current={active ? 'page' : undefined}
+                      className={`admin-nav-item ${active ? 'is-active' : ''}`}
+                      href={item.href}
+                      key={item.label}
+                    >
+                      <Icon name={item.icon} />
+                      <b><span className="admin-nav-label-full">{item.label}</span><span className="admin-nav-label-mobile">{item.mobileLabel ?? item.label}</span></b>
                     </Link>
                   );
                 })}
@@ -190,7 +209,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
           <Link className="admin-back-link" href="/">← Về trang game</Link>
         </aside>
 
-        <main className="admin-content">
+        <main className="admin-content" id="admin-main" tabIndex={-1}>
           {error ? (
             <section className="admin-api-error" role="alert">
               <span>Không thể tải dữ liệu</span>

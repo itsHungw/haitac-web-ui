@@ -20,7 +20,9 @@ export interface ForumProfile {
   totalTopUp: number;
   loyaltyPoints: number;
   activationCost: number;
+  vipLevel: number;
   character: ForumCharacter | null;
+  characters: ForumCharacter[];
 }
 
 export interface RankingEntry {

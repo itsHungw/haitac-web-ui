@@ -4,8 +4,8 @@ import { RechargeForm } from '@/components/recharge/RechargeForm';
 import { Parchment } from '@/components/ui/Parchment';
 
 export const metadata = {
-  title: 'Nạp thẻ & Ruby - Hải Tặc Tí Hon',
-  description: 'Cổng nạp thẻ cào, chuyển khoản QR và ví điện tử tự động 24/7 game Hải Tặc Tí Hon.',
+  title: 'Nạp Coin - Hải Tặc Tí Hon',
+  description: 'Nạp Coin qua chuyển khoản ngân hàng, ví điện tử hoặc thẻ cào để sử dụng trong Hải Tặc Tí Hon.',
 };
 
 export default function RechargePage() {
@@ -14,16 +14,16 @@ export default function RechargePage() {
       <main>
         <InnerMasthead
           eyebrow="CỔNG NẠP CHÍNH THỨC"
-          title="Nạp Thẻ & Ruby"
-          description="Nạp Ruby tự động 24/7 qua Thẻ cào, Ví MoMo, Ngân hàng (VietQR) với tỷ lệ ưu đãi tốt nhất."
+          title="Nạp Coin"
+          description="Coin là đơn vị nạp chính. Sau khi nhận Coin, bạn có thể đổi sang Ruby, Beri hoặc Extol tại NPC Nami trong game."
         />
         <section className="recharge-section">
           <div className="page-width">
             <Parchment className="recharge-scroll">
               <div className="recharge-banner-note">
-                <span>SỰ KIỆN ƯU ĐÃI NẠP</span>
-                <strong>KHUYẾN MÃI +20% ĐẾN +50% GIÁ TRỊ RUBY</strong>
-                <p>Tự động xử lý &amp; cộng Ruby trong 30 giây</p>
+                <span>CHUYỂN KHOẢN LÀ KÊNH ƯU TIÊN</span>
+                <strong>NẠP TIỀN NHẬN COIN · TỰ CHỌN CÁCH QUY ĐỔI TRONG GAME</strong>
+                <p>Thẻ cào được đặt ở kênh dự phòng do chiết khấu đối tác cao.</p>
               </div>
               <RechargeForm />
             </Parchment>

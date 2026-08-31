@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { extractErrorMessage } from '@/lib/api/errors';
 import { adminService } from '../services/admin.service';
 import type { AdminEconomy, AdminTransactionStatus } from '../types/admin.types';
+import { useAdminWorkspace } from './AdminShell';
 
 const integer = new Intl.NumberFormat('vi-VN');
 const money = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
@@ -14,6 +15,7 @@ const statusLabel: Record<AdminTransactionStatus, string> = {
 };
 
 export function EconomyDashboard() {
+  const { handleAdminError } = useAdminWorkspace();
   const [data, setData] = useState<AdminEconomy | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -23,7 +25,9 @@ export function EconomyDashboard() {
     setLoading(true); setError(null);
     adminService.getEconomy()
       .then(setData)
-      .catch((caught) => setError(extractErrorMessage(caught, 'Không thể tải dữ liệu kinh tế.')))
+      .catch((caught) => {
+        if (!handleAdminError(caught)) setError(extractErrorMessage(caught, 'Không thể tải dữ liệu kinh tế.'));
+      })
       .finally(() => setLoading(false));
   }
 
@@ -38,7 +42,7 @@ export function EconomyDashboard() {
       </section>
 
       {error && <div className="admin-inline-error" role="alert">{error}<button onClick={load}>Thử lại</button></div>}
-      <section className="admin-economy-ledger" aria-label="Chỉ số kinh tế">
+      <section className="admin-economy-ledger" aria-label="Chỉ số kinh tế" aria-busy={loading}>
         <article><span>Coin lưu hành</span><strong>{data ? integer.format(data.circulatingCoin) : '—'}</strong><small>Tổng số dư tài khoản</small></article>
         <article><span>VND trong ví</span><strong>{data ? integer.format(data.circulatingVnd) : '—'}</strong><small>Số dư chưa sử dụng</small></article>
         <article><span>Nạp hôm nay</span><strong>{data ? money.format(data.topUpToday) : '—'}</strong><small>Giao dịch thành công</small></article>

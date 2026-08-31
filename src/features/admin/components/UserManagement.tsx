@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ApiError, extractErrorMessage } from '@/lib/api/errors';
+import { extractErrorMessage } from '@/lib/api/errors';
 import { adminService } from '../services/admin.service';
 import type {
   AdminPlayerDetail,
@@ -11,6 +11,7 @@ import type {
   AdminPlayerStatus,
 } from '../types/admin.types';
 import { useAdminWorkspace } from './AdminShell';
+import { useAdminDialog } from '../hooks/useAdminDialog';
 
 const numberFormatter = new Intl.NumberFormat('vi-VN');
 const dateFormatter = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short' });
@@ -27,7 +28,7 @@ function playerStatus(player: { locked: boolean; online: boolean }) {
 
 export function UserManagement({ initialQuery = '' }: { initialQuery?: string }) {
   const router = useRouter();
-  const { refreshOverview } = useAdminWorkspace();
+  const { refreshOverview, handleAdminError } = useAdminWorkspace();
   const [queryInput, setQueryInput] = useState(initialQuery);
   const [query, setQuery] = useState(initialQuery);
   const [role, setRole] = useState<AdminPlayerRole>('all');
@@ -59,13 +60,8 @@ export function UserManagement({ initialQuery = '' }: { initialQuery?: string })
     setPage(0);
   }, [initialQuery]);
 
-  const handleAuthError = useCallback((caught: unknown) => {
-    if (caught instanceof ApiError && caught.status === 401) {
-      router.replace('/login');
-      return true;
-    }
-    return false;
-  }, [router]);
+  const closePlayerDrawer = useCallback(() => setSelectedUser(null), []);
+  const playerDrawerRef = useAdminDialog<HTMLElement>(Boolean(selectedUser), closePlayerDrawer);
 
   useEffect(() => {
     let active = true;
@@ -74,12 +70,12 @@ export function UserManagement({ initialQuery = '' }: { initialQuery?: string })
     adminService.getPlayers({ q: query, role, status, page, size: 20 })
       .then((data) => { if (active) setResult(data); })
       .catch((caught) => {
-        if (!active || handleAuthError(caught)) return;
+        if (!active || handleAdminError(caught)) return;
         setError(extractErrorMessage(caught, 'Không thể tải danh sách người chơi.'));
       })
       .finally(() => { if (active) setIsLoading(false); });
     return () => { active = false; };
-  }, [handleAuthError, page, query, reloadKey, role, status]);
+  }, [handleAdminError, page, query, reloadKey, role, status]);
 
   useEffect(() => {
     if (!selectedUser) {
@@ -103,26 +99,16 @@ export function UserManagement({ initialQuery = '' }: { initialQuery?: string })
         }
       })
       .catch((caught) => {
-        if (!active || handleAuthError(caught)) return;
+        if (!active || handleAdminError(caught)) return;
         setDetailError(extractErrorMessage(caught, 'Không thể tải hồ sơ người chơi.'));
       })
       .finally(() => { if (active) setIsLoadingDetail(false); });
     return () => { active = false; };
-  }, [handleAuthError, selectedUser]);
-
-
-  useEffect(() => {
-    if (!selectedUser) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setSelectedUser(null);
-    };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [selectedUser]);
+  }, [handleAdminError, selectedUser]);
 
   function syncUrl(nextQuery: string) {
     const url = nextQuery ? `/admin/users?q=${encodeURIComponent(nextQuery)}` : '/admin/users';
-    window.history.replaceState(null, '', url);
+    router.replace(url, { scroll: false });
   }
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
@@ -153,7 +139,7 @@ export function UserManagement({ initialQuery = '' }: { initialQuery?: string })
       setReloadKey((value) => value + 1);
       await refreshOverview();
     } catch (caught) {
-      if (!handleAuthError(caught)) {
+      if (!handleAdminError(caught)) {
         setDetailError(extractErrorMessage(caught, 'Không thể cập nhật trạng thái tài khoản.'));
       }
     } finally {
@@ -168,20 +154,38 @@ export function UserManagement({ initialQuery = '' }: { initialQuery?: string })
       setBalanceError('Vui lòng nhập lý do điều chỉnh (ít nhất 3 ký tự).');
       return;
     }
+    const nextCoin = editCoin.trim() === '' ? null : Number(editCoin);
+    const nextVnd = editVnd.trim() === '' ? null : Number(editVnd);
+    if (
+      nextCoin === null || nextVnd === null
+      || !Number.isSafeInteger(nextCoin) || nextCoin < 0
+      || !Number.isSafeInteger(nextVnd) || nextVnd < 0
+    ) {
+      setBalanceError('Coin và VND phải là số nguyên không âm hợp lệ.');
+      return;
+    }
+    const payload = {
+      coin: nextCoin !== detail.coin ? nextCoin : undefined,
+      vnd: nextVnd !== detail.vnd ? nextVnd : undefined,
+      reason: balanceReason.trim(),
+    };
+    if (payload.coin === undefined && payload.vnd === undefined) {
+      setBalanceError('Số dư chưa có thay đổi nào để lưu.');
+      return;
+    }
     setIsMutatingBalance(true);
     setBalanceError(null);
     setBalanceMessage(null);
     try {
-      const updated = await adminService.updatePlayerBalance(detail.user, {
-        coin: Number(editCoin) >= 0 ? Number(editCoin) : undefined,
-        vnd: Number(editVnd) >= 0 ? Number(editVnd) : undefined,
-        reason: balanceReason.trim(),
-      });
+      const updated = await adminService.updatePlayerBalance(detail.user, payload);
       setDetail(updated);
-      setBalanceMessage('Đã cập nhật số dư thành công!');
+      setEditCoin(String(updated.coin));
+      setEditVnd(String(updated.vnd));
+      setBalanceReason('');
+      setBalanceMessage('Đã cập nhật số dư và ghi nhật ký.');
       void refreshOverview();
     } catch (err) {
-      setBalanceError(extractErrorMessage(err, 'Không thể cập nhật số dư.'));
+      if (!handleAdminError(err)) setBalanceError(extractErrorMessage(err, 'Không thể cập nhật số dư.'));
     } finally {
       setIsMutatingBalance(false);
     }
@@ -275,10 +279,10 @@ export function UserManagement({ initialQuery = '' }: { initialQuery?: string })
 
       {selectedUser && (
         <div className="admin-drawer-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedUser(null); }}>
-          <aside className="admin-player-drawer" role="dialog" aria-modal="true" aria-labelledby="player-detail-title">
+          <aside ref={playerDrawerRef} className="admin-player-drawer" role="dialog" aria-modal="true" aria-labelledby="player-detail-title" tabIndex={-1}>
             <header>
               <div><span>HỒ SƠ NGƯỜI CHƠI</span><h2 id="player-detail-title">{selectedUser}</h2></div>
-              <button type="button" onClick={() => setSelectedUser(null)} aria-label="Đóng hồ sơ">×</button>
+              <button type="button" onClick={closePlayerDrawer} aria-label="Đóng hồ sơ" data-dialog-initial-focus>×</button>
             </header>
 
             {isLoadingDetail ? <div className="admin-drawer-loading">Đang tải hồ sơ...</div> : detail ? (
@@ -314,58 +318,54 @@ export function UserManagement({ initialQuery = '' }: { initialQuery?: string })
                   </div>
                 </section>
 
-                <section className="admin-detail-section" style={{ background: '#f8fafc', padding: '16px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                  <h3 style={{ margin: '0 0 10px', fontSize: '13px', color: '#1e293b' }}>Điều chỉnh số dư (Coin / VND)</h3>
-                  <form onSubmit={handleBalanceSubmit} style={{ display: 'grid', gap: '10px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                      <label style={{ fontSize: '11px', color: '#64748b' }}>
-                        Coin (Ruby Web)
+                <section className="admin-detail-section admin-balance-editor">
+                  <h3>Điều chỉnh số dư</h3>
+                  <p>Chỉ trường thay đổi mới được gửi lên máy chủ và mọi cập nhật đều được ghi audit.</p>
+                  <form onSubmit={handleBalanceSubmit}>
+                    <div className="admin-balance-fields">
+                      <label>
+                        Coin
                         <input
                           type="number"
+                          min="0"
+                          step="1"
                           value={editCoin}
                           onChange={(e) => setEditCoin(e.target.value)}
-                          style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', marginTop: '2px' }}
+                          inputMode="numeric"
                         />
                       </label>
-                      <label style={{ fontSize: '11px', color: '#64748b' }}>
-                        VND Số dư
+                      <label>
+                        VND
                         <input
                           type="number"
+                          min="0"
+                          step="1"
                           value={editVnd}
                           onChange={(e) => setEditVnd(e.target.value)}
-                          style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', marginTop: '2px' }}
+                          inputMode="numeric"
                         />
                       </label>
                     </div>
-                    <label style={{ fontSize: '11px', color: '#64748b' }}>
+                    <label>
                       Lý do điều chỉnh (ghi audit)
                       <input
                         type="text"
                         value={balanceReason}
                         onChange={(e) => setBalanceReason(e.target.value)}
                         placeholder="Ví dụ: Đền bù bảo trì, hỗ trợ người chơi..."
-                        style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', marginTop: '2px' }}
+                        minLength={3}
+                        maxLength={240}
                         required
                       />
                     </label>
                     <button
                       type="submit"
                       disabled={isMutatingBalance}
-                      style={{
-                        padding: '8px 12px',
-                        background: '#2563eb',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                      }}
                     >
-                      {isMutatingBalance ? 'Đang lưu...' : '💾 Cập nhật số dư'}
+                      {isMutatingBalance ? 'Đang lưu...' : 'Cập nhật số dư'}
                     </button>
-                    {balanceMessage && <p style={{ margin: 0, fontSize: '11px', color: '#16a34a' }}>✨ {balanceMessage}</p>}
-                    {balanceError && <p style={{ margin: 0, fontSize: '11px', color: '#dc2626' }}>⚠️ {balanceError}</p>}
+                    {balanceMessage && <p className="admin-action-success" role="status" aria-live="polite">{balanceMessage}</p>}
+                    {balanceError && <p className="admin-action-error" role="alert">{balanceError}</p>}
                   </form>
                 </section>
 

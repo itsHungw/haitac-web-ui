@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { extractErrorMessage } from '@/lib/api/errors';
 import { adminService } from '../services/admin.service';
 import type { AdminGiftCode, AdminGiftReward, GiftCodePayload } from '../types/admin.types';
+import { useAdminWorkspace } from './AdminShell';
 
 const number = new Intl.NumberFormat('vi-VN');
 const emptyForm = { code: '', beri: '0', ruby: '0', rewards: '', message: '', maxRedemptions: '100', eligibleUsers: '', reason: '' };
@@ -24,6 +25,7 @@ function parseRewards(value: string): AdminGiftReward[] {
 }
 
 export function GiftCodeManagement() {
+  const { handleAdminError } = useAdminWorkspace();
   const [codes, setCodes] = useState<AdminGiftCode[]>([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -35,7 +37,9 @@ export function GiftCodeManagement() {
 
   function load() {
     setLoading(true); setError(null);
-    adminService.getGiftCodes().then(setCodes).catch((caught) => setError(extractErrorMessage(caught, 'Không thể tải gift code.'))).finally(() => setLoading(false));
+    adminService.getGiftCodes().then(setCodes).catch((caught) => {
+      if (!handleAdminError(caught)) setError(extractErrorMessage(caught, 'Không thể tải gift code.'));
+    }).finally(() => setLoading(false));
   }
   useEffect(load, []);
 
@@ -59,7 +63,9 @@ export function GiftCodeManagement() {
       setCodes((current) => selected ? current.map((item) => item.id === saved.id ? saved : item) : [saved, ...current]);
       setSelected(saved); setForm((current) => ({ ...current, reason: '' }));
       setSuccess(selected ? 'Đã cập nhật gift code và ghi audit.' : 'Đã tạo gift code và ghi audit.');
-    } catch (caught) { setError(extractErrorMessage(caught, caught instanceof Error ? caught.message : 'Không thể lưu gift code.')); }
+    } catch (caught) {
+      if (!handleAdminError(caught)) setError(extractErrorMessage(caught, caught instanceof Error ? caught.message : 'Không thể lưu gift code.'));
+    }
     finally { setSaving(false); }
   }
 
@@ -82,7 +88,7 @@ export function GiftCodeManagement() {
           <label>Giới hạn lượt nhập<input type="number" min={selected?.usedCount ?? 1} max="1000000" value={form.maxRedemptions} onChange={(event) => field('maxRedemptions', event.target.value)} /></label>
           <label>Tài khoản được nhận <small>Để trống nếu áp dụng toàn máy chủ; phân cách bằng dấu phẩy.</small><textarea value={form.eligibleUsers} onChange={(event) => field('eligibleUsers', event.target.value)} rows={3} /></label>
           <label>Lý do thay đổi<input value={form.reason} onChange={(event) => field('reason', event.target.value)} maxLength={240} placeholder="Bắt buộc để ghi audit" required /></label>
-          {error && <p className="admin-action-error" role="alert">{error}</p>}{success && <p className="admin-action-success" role="status">{success}</p>}
+          {error && <p className="admin-action-error" role="alert">{error}</p>}{success && <p className="admin-action-success" role="status" aria-live="polite">{success}</p>}
           <button className="admin-gift-save" type="submit" disabled={saving}>{saving ? 'Đang lưu…' : selected ? 'Lưu thay đổi' : 'Tạo gift code'}</button>
         </form>
       </section>

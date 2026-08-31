@@ -1189,6 +1189,28 @@ img.pixelated, .pixel-art { image-rendering: pixelated; image-rendering: crisp-e
 .milestone-track { position: relative; margin: 45px 8px 15px; height: 5px; display: flex; justify-content: space-between; background: #b68a55; }.milestone-track > i { position: absolute; inset: 0 auto 0 0; background: #37805b; }.milestone-track > span { position: relative; width: 17px; height: 17px; margin-top: -6px; border: 3px solid #6d492d; border-radius: 50%; background: #e0bd80; }.milestone-track > span.is-reached { background: #55a373; }.milestone-track b { position: absolute; top: 19px; left: 50%; font-family: var(--font-mono); font-size: 6px; transform: translateX(-50%); }
 .profile-exchange > div { margin-top: 18px; border-block: 1px solid #bd925b; }.profile-exchange p { min-height: 41px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; border-bottom: 1px solid #d0a96f; font-size: 8px; }.profile-exchange p:last-child { border-bottom: 0; }.profile-exchange p strong { color: #a43f2d; text-align: right; }.profile-exchange > small { display: block; margin-top: 12px; color: #735438; font-size: 7px; line-height: 1.5; }
 .profile-loading, .profile-guest { min-height: 540px; padding-block: 100px; }.profile-loading { display: grid; align-content: center; gap: 18px; }.profile-loading span { height: 35px; background: #d2b273; animation: wiki-pulse 1s ease-in-out infinite alternate; }.profile-guest { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }.profile-guest > svg { width: 50px; height: 50px; color: #9e3a2c; }.profile-guest h1 { margin-top: 12px; font-size: 42px; }.profile-guest p { margin-top: 9px; color: #71533a; }.profile-guest > div { margin-top: 20px; display: flex; gap: 8px; }.profile-guest a { min-width: 120px; padding: 11px 15px; border: 2px solid #392419; background: #a83b2b; color: white; font-family: var(--font-mono); font-size: 8px; font-weight: 700; text-decoration: none; }
+
+/* Account profile — account-wide money and character-scoped progress */
+.profile-account-summary { position: relative; z-index: 2; min-height: 112px; margin-top: 30px; padding: 18px 20px; display: grid; grid-template-columns: minmax(230px, 1fr) minmax(450px, 1.65fr) auto; align-items: center; gap: 24px; border: 3px solid #352116; background: linear-gradient(90deg, rgba(255,244,211,.84), rgba(235,197,132,.82)), url('/assets/content-bg.png') center / 100% 100%; box-shadow: 7px 7px 0 rgba(2,15,26,.4); color: #3d2819; }
+.profile-account-summary::after { content: 'ACCOUNT'; position: absolute; right: 24%; bottom: -18px; color: rgba(103,63,29,.055); font-family: var(--font-mono); font-size: 54px; font-weight: 900; pointer-events: none; transform: rotate(-3deg); }
+.profile-account-summary__identity { position: relative; z-index: 1; min-width: 0; display: flex; align-items: center; gap: 13px; }
+.profile-account-summary__seal { width: 54px; height: 54px; display: grid; flex: none; place-items: center; border: 2px solid #472b19; border-radius: 50%; background: #9d382d; color: #fff1cc; box-shadow: inset 0 0 0 5px rgba(255,255,255,.1), 3px 3px 0 #b98142; }
+.profile-account-summary__seal.is-member { background: #2e7150; }.profile-account-summary__seal svg { width: 25px; }
+.profile-account-summary__identity > div { min-width: 0; display: grid; }.profile-account-summary__identity small { color: #a3402e; font-family: var(--font-mono); font-size: 6px; font-weight: 800; letter-spacing: .1em; }.profile-account-summary__identity strong { overflow: hidden; margin-top: 3px; font-size: 21px; text-overflow: ellipsis; white-space: nowrap; }.profile-account-summary__identity div > span { margin-top: 3px; color: #72543a; font-size: 8px; }
+.profile-account-summary dl { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-left: 1px solid #bd955f; }.profile-account-summary dl > div { min-width: 0; min-height: 48px; padding: 4px 13px; display: grid; align-content: center; border-right: 1px solid #bd955f; }.profile-account-summary dt { color: #876446; font-family: var(--font-mono); font-size: 6px; }.profile-account-summary dd { margin-top: 4px; overflow: hidden; font-size: 10px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }.profile-account-summary dd.is-member { color: #28704e; }.profile-account-summary dd.is-locked { color: #a23d2e; }
+.profile-account-summary > a { position: relative; z-index: 1; min-height: 44px; padding: 10px 14px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 2px solid #402617; background: #e1a01c; color: #302012; font-family: var(--font-mono); font-size: 7px; font-weight: 800; text-decoration: none; box-shadow: 3px 3px 0 #79521b; }.profile-account-summary > a svg { width: 15px; }
+
+.profile-character-switcher-wrap { position: relative; z-index: 2; margin-top: 17px; }
+.character-switcher { min-width: 0; padding: 14px 16px 16px; border: 2px solid #3d2719; background: rgba(244,220,168,.94); color: #422c1b; box-shadow: 4px 4px 0 rgba(2,15,26,.32); }
+.character-switcher__heading { margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }.character-switcher__heading span, .character-switcher__heading b { color: #9f422f; font-family: var(--font-mono); font-size: 7px; letter-spacing: .1em; }.character-switcher__heading b { color: #795a3c; font-weight: 500; letter-spacing: 0; }
+.character-switcher__slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.character-switcher__slots button { position: relative; min-width: 0; min-height: 64px; padding: 7px 28px 7px 7px; display: grid; grid-template-columns: 46px minmax(0, 1fr); align-items: center; gap: 10px; overflow: hidden; border: 1px solid #a87b48; background: rgba(255,244,214,.55); color: #4a321f; cursor: pointer; text-align: left; transition: background 150ms ease, border-color 150ms ease, transform 150ms ease; }.character-switcher__slots button:hover:not(:disabled) { border-color: #654024; background: #fff0c9; transform: translateY(-1px); }.character-switcher__slots button.is-selected { border: 2px solid #253d45; background: #173f54; color: #fff3d1; box-shadow: inset 0 -4px 0 rgba(0,0,0,.15); }.character-switcher__slots button.is-empty { opacity: .55; cursor: default; }
+.character-switcher__portrait { position: relative; width: 46px; height: 46px; display: grid; place-items: center; overflow: hidden; border: 2px solid currentColor; border-radius: 50%; background: #876d4c; color: #fff4d4; }.character-switcher__portrait img { object-fit: cover; object-position: center 18%; }.character-switcher__portrait svg { width: 19px; }.character-switcher__portrait.class-1 { background: #a83a32; }.character-switcher__portrait.class-2 { background: #315d48; }.character-switcher__portrait.class-3 { background: #357ca2; }.character-switcher__portrait.class-4 { background: #ba738d; }.character-switcher__portrait.class-5 { background: #b88a39; }
+.character-switcher__copy { min-width: 0; display: grid; gap: 3px; }.character-switcher__copy strong, .character-switcher__copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.character-switcher__copy strong { font-size: 11px; }.character-switcher__copy small { opacity: .74; font-family: var(--font-mono); font-size: 6px; }.character-switcher__slots button > i { position: absolute; top: 6px; right: 7px; opacity: .45; font-family: var(--font-mono); font-size: 7px; font-style: normal; }
+.character-switcher.is-compact { position: relative; z-index: 2; width: min(340px, 28vw); padding: 0; border: 0; background: transparent; box-shadow: none; }.character-switcher.is-compact .character-switcher__slots { gap: 5px; }.character-switcher.is-compact button { min-height: 52px; padding: 5px 18px 5px 5px; grid-template-columns: 34px minmax(0, 1fr); gap: 6px; background: rgba(255,245,216,.42); }.character-switcher.is-compact button.is-selected { background: #173f54; }.character-switcher.is-compact .character-switcher__portrait { width: 34px; height: 34px; }.character-switcher.is-compact .character-switcher__copy strong { font-size: 8px; }.character-switcher.is-compact .character-switcher__copy small { display: none; }.character-switcher.is-compact button > i { top: 4px; right: 4px; font-size: 5px; }
+.forum-account--member { gap: 14px; }.forum-account--member .forum-account__identity { min-width: 150px; }.forum-account__status .is-vip { color: #8b5b0e; }.forum-account__status { flex: none; }.forum-account--member nav { flex: none; }
+.profile-wallet-note { margin-top: 12px; display: flex; align-items: flex-start; gap: 7px; color: #76583c; font-size: 7px; line-height: 1.55; }.profile-wallet-note svg { width: 15px; flex: none; color: #a4422f; }
+.milestone-track small { position: absolute; top: 30px; left: 50%; color: #755437; font-family: var(--font-mono); font-size: 5px; transform: translateX(-50%); }
 .wiki-provenance svg { flex: 0 0 auto; color: var(--red-800); }
 .wiki-state { min-height: 180px; padding: 28px; display: grid; place-items: center; align-content: center; gap: 9px; color: #735a3e; text-align: center; }
 .wiki-state p { max-width: 360px; font-size: 11px; line-height: 1.6; }
@@ -1525,20 +1547,20 @@ img.pixelated, .pixel-art { image-rendering: pixelated; image-rendering: crisp-e
   color: var(--red-600);
 }
 
-.vip-perks-list {
+.coin-use-list {
   display: grid;
   gap: 8px;
   list-style: none;
   font-size: 12px;
   color: var(--ink);
 }
-.vip-perks-list li {
+.coin-use-list li {
   padding: 6px 0;
   border-bottom: 1px solid var(--paper-300);
   display: flex;
   gap: 8px;
 }
-.vip-perks-list li strong {
+.coin-use-list li strong {
   color: var(--red-800);
   font-family: var(--font-mono);
 }
@@ -1579,6 +1601,8 @@ img.pixelated, .pixel-art { image-rendering: pixelated; image-rendering: crisp-e
   .telco-selector { grid-template-columns: repeat(3, 1fr); }
   .denom-grid { grid-template-columns: repeat(2, 1fr); }
   .bank-qr-card { flex-direction: column; text-align: center; }
+  .recharge-banner-note { align-items: flex-start; flex-direction: column; gap: 7px; }
+  .recharge-banner-note p { margin-left: 0; }
 }
 
 @media (max-width: 560px) {
@@ -1928,4 +1952,36 @@ img.pixelated, .pixel-art { image-rendering: pixelated; image-rendering: crisp-e
   .profile-milestones, .profile-exchange { padding-inline: 18px; border-inline: 0; box-shadow: none; }
   .profile-milestones header { grid-template-columns: 1fr; }.profile-milestones header p { margin-top: 7px; text-align: left; }
   .milestone-track { margin-inline: 2px; }.milestone-track b { font-size: 5px; }
+}
+
+@media (max-width: 1100px) {
+  .profile-account-summary { grid-template-columns: minmax(230px, 1fr) auto; }
+  .profile-account-summary dl { grid-column: 1 / -1; grid-row: 2; }
+  .forum-account--member .character-switcher.is-compact { order: 4; width: calc(100% - 80px); margin-left: 80px; }
+  .forum-account--member nav { order: 5; margin-left: 80px; }
+}
+
+@media (max-width: 760px) {
+  .profile-account-summary { grid-template-columns: 1fr; gap: 16px; }
+  .profile-account-summary dl { grid-column: auto; grid-row: auto; grid-template-columns: 1fr 1fr; border-top: 1px solid #bd955f; border-left: 0; }
+  .profile-account-summary dl > div { border-bottom: 1px solid #bd955f; }
+  .profile-account-summary > a { width: 100%; }
+  .character-switcher__slots { grid-template-columns: 1fr; }
+  .character-switcher__slots button { min-height: 60px; }
+  .forum-account--member .character-switcher.is-compact { width: 100%; margin-left: 0; }
+  .forum-account--member .character-switcher.is-compact .character-switcher__slots { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .forum-account--member nav { margin-left: 0; }
+  .milestone-track { margin-bottom: 31px; }
+}
+
+@media (max-width: 440px) {
+  .profile-account-summary, .profile-character-switcher-wrap { width: 100%; }
+  .profile-account-summary { border-inline: 0; box-shadow: none; }
+  .profile-account-summary dl { grid-template-columns: 1fr 1fr; }
+  .profile-account-summary dl > div:nth-child(2n) { border-right: 0; }
+  .character-switcher { border-inline: 0; box-shadow: none; }
+  .forum-account--member .character-switcher.is-compact .character-switcher__copy { display: none; }
+  .forum-account--member .character-switcher.is-compact button { min-height: 48px; padding: 5px; grid-template-columns: 1fr; justify-items: center; }
+  .forum-account__status { grid-template-columns: 1fr 1fr 1fr; margin-left: 0; }
+  .forum-account__status span, .forum-account__status b { width: 100%; justify-content: center; }
 }

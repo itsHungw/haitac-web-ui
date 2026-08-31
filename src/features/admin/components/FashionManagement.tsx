@@ -1,10 +1,11 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ApiError, extractErrorMessage } from '@/lib/api/errors';
+import { extractErrorMessage } from '@/lib/api/errors';
 import { adminService } from '../services/admin.service';
 import type { AdminFashionItem } from '../types/admin.types';
+import { useAdminWorkspace } from './AdminShell';
+import { useAdminDialog } from '../hooks/useAdminDialog';
 
 const numberFormatter = new Intl.NumberFormat('vi-VN');
 
@@ -15,7 +16,7 @@ interface SavedGroup {
 }
 
 export function FashionManagement() {
-  const router = useRouter();
+  const { handleAdminError } = useAdminWorkspace();
   const [items, setItems] = useState<AdminFashionItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,14 +72,6 @@ export function FashionManagement() {
     }
   };
 
-  const handleAuthError = useCallback((caught: unknown) => {
-    if (caught instanceof ApiError && caught.status === 401) {
-      router.replace('/login');
-      return true;
-    }
-    return false;
-  }, [router]);
-
   // Load Fashion Items from API
   useEffect(() => {
     let active = true;
@@ -92,27 +85,21 @@ export function FashionManagement() {
         }
       })
       .catch((caught) => {
-        if (!active || handleAuthError(caught)) return;
+        if (!active || handleAdminError(caught)) return;
         setError(extractErrorMessage(caught, 'Không thể tải danh sách cải trang.'));
       })
       .finally(() => {
         if (active) setIsLoading(false);
       });
     return () => { active = false; };
-  }, [handleAuthError, reloadKey]);
+  }, [handleAdminError, reloadKey]);
 
-  // Keyboard escape handler for drawers & modals
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setEditingItem(null);
-        setShowBulkPriceModal(false);
-        setShowGroupModal(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  const closeEditDialog = useCallback(() => setEditingItem(null), []);
+  const closeBulkDialog = useCallback(() => setShowBulkPriceModal(false), []);
+  const closeGroupDialog = useCallback(() => setShowGroupModal(false), []);
+  const editDialogRef = useAdminDialog<HTMLElement>(Boolean(editingItem), closeEditDialog);
+  const bulkDialogRef = useAdminDialog<HTMLDivElement>(showBulkPriceModal, closeBulkDialog);
+  const groupDialogRef = useAdminDialog<HTMLDivElement>(showGroupModal, closeGroupDialog);
 
   // Compute stats
   const stats = useMemo(() => {
@@ -181,8 +168,8 @@ export function FashionManagement() {
       if (isNaN(parsedPrice) || parsedPrice < -1) {
         throw new Error('Giá bán không hợp lệ (-1: khóa bán, >= 0: giá bán).');
       }
-      if (isNaN(parsedIcon) || parsedIcon < 0) {
-        throw new Error('Icon ID không hợp lệ.');
+      if (isNaN(parsedIcon) || parsedIcon < 0 || parsedIcon > 32767) {
+        throw new Error('Icon ID phải nằm trong khoảng 0–32767.');
       }
       if (!editForm.name.trim()) {
         throw new Error('Tên cải trang không được để trống.');
@@ -201,7 +188,7 @@ export function FashionManagement() {
       setEditingItem(null);
       setReloadKey((k) => k + 1);
     } catch (caught) {
-      setEditError(extractErrorMessage(caught, caught instanceof Error ? caught.message : 'Không thể lưu cải trang.'));
+      if (!handleAdminError(caught)) setEditError(extractErrorMessage(caught, caught instanceof Error ? caught.message : 'Không thể lưu cải trang.'));
     } finally {
       setIsSavingEdit(false);
     }
@@ -228,7 +215,7 @@ export function FashionManagement() {
       setSelectedIds([]);
       setReloadKey((k) => k + 1);
     } catch (caught) {
-      setError(extractErrorMessage(caught, caught instanceof Error ? caught.message : 'Không thể cập nhật hàng loạt.'));
+      if (!handleAdminError(caught)) setError(extractErrorMessage(caught, caught instanceof Error ? caught.message : 'Không thể cập nhật hàng loạt.'));
     } finally {
       setIsBulkSubmitting(false);
     }
@@ -551,13 +538,13 @@ export function FashionManagement() {
             if (e.target === e.currentTarget) setEditingItem(null);
           }}
         >
-          <aside className="admin-player-drawer" role="dialog" aria-modal="true" aria-labelledby="fashion-edit-title">
+          <aside ref={editDialogRef} className="admin-player-drawer" role="dialog" aria-modal="true" aria-labelledby="fashion-edit-title" tabIndex={-1}>
             <header>
               <div>
                 <span>CHỈNH SỬA CẢI TRANG #{editingItem.id}</span>
                 <h2 id="fashion-edit-title">{editingItem.name}</h2>
               </div>
-              <button type="button" onClick={() => setEditingItem(null)} aria-label="Đóng">×</button>
+              <button type="button" onClick={closeEditDialog} aria-label="Đóng" data-dialog-initial-focus>×</button>
             </header>
 
             <div className="admin-drawer-body">
@@ -579,6 +566,7 @@ export function FashionManagement() {
                     <input
                       type="number"
                       min="0"
+                      max="32767"
                       value={editForm.icon}
                       onChange={(e) => setEditForm({ ...editForm, icon: e.target.value })}
                       required
@@ -666,7 +654,7 @@ export function FashionManagement() {
             if (e.target === e.currentTarget) setShowBulkPriceModal(false);
           }}
         >
-          <div className="admin-modal-card" role="dialog" aria-modal="true" aria-labelledby="bulk-price-title">
+          <div ref={bulkDialogRef} className="admin-modal-card" role="dialog" aria-modal="true" aria-labelledby="bulk-price-title" tabIndex={-1}>
             <header>
               <span>THAO TÁC HÀNG LOẠT</span>
               <h2 id="bulk-price-title">Thiết lập giá {selectedIds.length} cải trang</h2>
@@ -697,7 +685,8 @@ export function FashionManagement() {
                 <button
                   type="button"
                   className="admin-modal-btn-cancel"
-                  onClick={() => setShowBulkPriceModal(false)}
+                  onClick={closeBulkDialog}
+                  data-dialog-initial-focus
                 >
                   Hủy
                 </button>
@@ -723,7 +712,7 @@ export function FashionManagement() {
             if (e.target === e.currentTarget) setShowGroupModal(false);
           }}
         >
-          <div className="admin-modal-card" style={{ width: 'min(580px, calc(100% - 32px))' }} role="dialog" aria-modal="true" aria-labelledby="groups-title">
+          <div ref={groupDialogRef} className="admin-modal-card admin-groups-modal" role="dialog" aria-modal="true" aria-labelledby="groups-title" tabIndex={-1}>
             <header>
               <span>QUẢN LÝ SỰ KIỆN</span>
               <h2 id="groups-title">Đợt phát hành sự kiện</h2>
@@ -839,7 +828,8 @@ export function FashionManagement() {
                 <button
                   type="button"
                   className="admin-modal-btn-cancel"
-                  onClick={() => setShowGroupModal(false)}
+                  onClick={closeGroupDialog}
+                  data-dialog-initial-focus
                 >
                   Đóng
                 </button>

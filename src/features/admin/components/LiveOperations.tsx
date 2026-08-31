@@ -4,12 +4,14 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { extractErrorMessage } from '@/lib/api/errors';
 import { adminService } from '../services/admin.service';
 import type { AdminLiveOperation, LiveOperationStatus, LiveOperationType } from '../types/admin.types';
+import { useAdminWorkspace } from './AdminShell';
 
 const date = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'medium' });
 const typeLabel: Record<LiveOperationType, string> = { BROADCAST: 'Thông báo toàn server', MAINTENANCE_ON: 'Bật bảo trì', MAINTENANCE_OFF: 'Tắt bảo trì' };
 const statusLabel: Record<LiveOperationStatus, string> = { PENDING: 'Đang chờ', PROCESSING: 'Đang xử lý', APPLIED: 'Đã áp dụng', FAILED: 'Thất bại' };
 
 export function LiveOperations() {
+  const { handleAdminError } = useAdminWorkspace();
   const [operations, setOperations] = useState<AdminLiveOperation[]>([]);
   const [type, setType] = useState<LiveOperationType>('BROADCAST');
   const [message, setMessage] = useState('');
@@ -23,7 +25,9 @@ export function LiveOperations() {
   async function load(silent = false) {
     if (!silent) setLoading(true);
     try { setOperations(await adminService.getLiveOperations()); setError(null); }
-    catch (caught) { if (!silent) setError(extractErrorMessage(caught, 'Không thể tải hàng đợi vận hành.')); }
+    catch (caught) {
+      if (!handleAdminError(caught) && !silent) setError(extractErrorMessage(caught, 'Không thể tải hàng đợi vận hành.'));
+    }
     finally { if (!silent) setLoading(false); }
   }
   useEffect(() => { void load(); const timer = window.setInterval(() => void load(true), 3000); return () => window.clearInterval(timer); }, []);
@@ -40,7 +44,9 @@ export function LiveOperations() {
       const created = await adminService.createLiveOperation(type, message.trim(), reason.trim());
       setOperations((current) => [created, ...current]); setReason(''); setConfirmation('');
       setSuccess(`Lệnh #${created.id} đã vào hàng đợi game server.`);
-    } catch (caught) { setError(extractErrorMessage(caught, 'Không thể gửi lệnh vận hành.')); }
+    } catch (caught) {
+      if (!handleAdminError(caught)) setError(extractErrorMessage(caught, 'Không thể gửi lệnh vận hành.'));
+    }
     finally { setSaving(false); }
   }
 
@@ -56,7 +62,7 @@ export function LiveOperations() {
         <label>Nội dung gửi đến game<textarea value={message} onChange={(event) => setMessage(event.target.value)} maxLength={500} rows={4} placeholder={type === 'BROADCAST' ? 'Ví dụ: Sự kiện săn boss bắt đầu sau 10 phút.' : 'Ví dụ: Máy chủ tạm đóng đăng nhập để bảo trì.'} required /></label>
         <label>Lý do nội bộ<input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={240} placeholder="Dùng cho nhật ký audit" required /></label>
         {dangerous && <label className="admin-live-confirm">Xác nhận thao tác nguy hiểm <small>Nhập chính xác XAC NHAN</small><input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} placeholder="XAC NHAN" /></label>}
-        {error && <p className="admin-action-error" role="alert">{error}</p>}{success && <p className="admin-action-success" role="status">{success}</p>}
+        {error && <p className="admin-action-error" role="alert">{error}</p>}{success && <p className="admin-action-success" role="status" aria-live="polite">{success}</p>}
         <button type="submit" disabled={saving}>{saving ? 'Đang gửi…' : 'Đưa lệnh vào hàng đợi'}</button>
       </form>
     </section>

@@ -1,10 +1,10 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ApiError, extractErrorMessage } from '@/lib/api/errors';
+import { FormEvent, useEffect, useState } from 'react';
+import { extractErrorMessage } from '@/lib/api/errors';
 import { adminService } from '../services/admin.service';
 import type { AdminAuditPage } from '../types/admin.types';
+import { useAdminWorkspace } from './AdminShell';
 
 const dateFormatter = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'medium' });
 
@@ -14,11 +14,27 @@ function actionLabel(action: string) {
   if (action === 'GIFT_CODE_CREATED') return 'Tạo gift code';
   if (action === 'GIFT_CODE_UPDATED') return 'Cập nhật gift code';
   if (action === 'LIVE_OPERATION_QUEUED') return 'Gửi lệnh vận hành';
+  if (action === 'UPDATE_PLAYER_BALANCE') return 'Điều chỉnh số dư';
+  if (action === 'UPDATE_FASHION') return 'Cập nhật cải trang';
+  if (action === 'BULK_UPDATE_FASHION') return 'Cập nhật cải trang hàng loạt';
   return action;
 }
 
+function actionIsDangerous(action: string) {
+  return ['ACCOUNT_LOCKED', 'UPDATE_PLAYER_BALANCE', 'BULK_UPDATE_FASHION', 'MAINTENANCE_ON'].some((value) => action.includes(value));
+}
+
+function formatAuditData(value: string | null) {
+  if (!value) return 'Không có dữ liệu';
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return value;
+  }
+}
+
 export function AuditLog() {
-  const router = useRouter();
+  const { handleAdminError } = useAdminWorkspace();
   const [queryInput, setQueryInput] = useState('');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
@@ -27,14 +43,6 @@ export function AuditLog() {
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
-  const handleAuthError = useCallback((caught: unknown) => {
-    if (caught instanceof ApiError && caught.status === 401) {
-      router.replace('/login');
-      return true;
-    }
-    return false;
-  }, [router]);
-
   useEffect(() => {
     let active = true;
     setIsLoading(true);
@@ -42,12 +50,12 @@ export function AuditLog() {
     adminService.getAudit(query, page, 20)
       .then((data) => { if (active) setResult(data); })
       .catch((caught) => {
-        if (!active || handleAuthError(caught)) return;
+        if (!active || handleAdminError(caught)) return;
         setError(extractErrorMessage(caught, 'Không thể tải nhật ký quản trị.'));
       })
       .finally(() => { if (active) setIsLoading(false); });
     return () => { active = false; };
-  }, [handleAuthError, page, query, reloadKey]);
+  }, [handleAdminError, page, query, reloadKey]);
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -79,10 +87,10 @@ export function AuditLog() {
         <div className="admin-audit-list">
           {isLoading ? Array.from({ length: 6 }).map((_, index) => <div className="admin-audit-skeleton" key={index}><span /></div>) : result?.entries.length ? result.entries.map((entry) => (
             <article className="admin-audit-entry" key={entry.id}>
-              <div className={`admin-audit-mark ${entry.action === 'ACCOUNT_LOCKED' ? 'is-danger' : 'is-success'}`} />
+              <div className={`admin-audit-mark ${actionIsDangerous(entry.action) ? 'is-danger' : 'is-success'}`} />
               <div className="admin-audit-event">
                 <span>{actionLabel(entry.action)}</span>
-                <h2>{entry.target}<small>{entry.targetType}</small></h2>
+                <h2>{entry.target}<small> · {entry.targetType}</small></h2>
                 <p>{entry.reason}</p>
               </div>
               <dl>
@@ -90,6 +98,15 @@ export function AuditLog() {
                 <div><dt>Địa chỉ IP</dt><dd>{entry.ipAddress || '—'}</dd></div>
                 <div><dt>Thời gian</dt><dd>{dateFormatter.format(new Date(entry.createdAt))}</dd></div>
               </dl>
+              {(entry.beforeData || entry.afterData) && (
+                <details className="admin-audit-payload">
+                  <summary>Xem dữ liệu thay đổi</summary>
+                  <div>
+                    <section><h3>Trước</h3><pre>{formatAuditData(entry.beforeData)}</pre></section>
+                    <section><h3>Sau</h3><pre>{formatAuditData(entry.afterData)}</pre></section>
+                  </div>
+                </details>
+              )}
               <span className="admin-audit-id">#{entry.id}</span>
             </article>
           )) : <div className="admin-table-empty">Chưa có thao tác quản trị nào được ghi nhận.</div>}

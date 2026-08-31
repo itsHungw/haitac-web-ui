@@ -6,8 +6,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 interface DenomOption {
   value: number;
   label: string;
-  ruby: number;
-  bonus: number;
+  coin: number;
 }
 
 const TELCOS = [
@@ -19,18 +18,18 @@ const TELCOS = [
 ];
 
 const DENOMS: DenomOption[] = [
-  { value: 10000, label: '10.000 đ', ruby: 100, bonus: 20 },
-  { value: 20000, label: '20.000 đ', ruby: 200, bonus: 40 },
-  { value: 50000, label: '50.000 đ', ruby: 500, bonus: 120 },
-  { value: 100000, label: '100.000 đ', ruby: 1000, bonus: 300 },
-  { value: 200000, label: '200.000 đ', ruby: 2000, bonus: 700 },
-  { value: 500000, label: '500.000 đ', ruby: 5000, bonus: 2000 },
-  { value: 1000000, label: '1.000.000 đ', ruby: 10000, bonus: 5000 },
+  { value: 10000, label: '10.000 đ', coin: 10000 },
+  { value: 20000, label: '20.000 đ', coin: 20000 },
+  { value: 50000, label: '50.000 đ', coin: 50000 },
+  { value: 100000, label: '100.000 đ', coin: 100000 },
+  { value: 200000, label: '200.000 đ', coin: 200000 },
+  { value: 500000, label: '500.000 đ', coin: 500000 },
+  { value: 1000000, label: '1.000.000 đ', coin: 1000000 },
 ];
 
 export function RechargeForm() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'card' | 'bank' | 'momo'>('card');
+  const [activeTab, setActiveTab] = useState<'bank' | 'momo' | 'card'>('bank');
   const [selectedTelco, setSelectedTelco] = useState('VIETTEL');
   const [selectedDenom, setSelectedDenom] = useState<DenomOption>(DENOMS[3]); // 100k
   const [username, setUsername] = useState(user?.user || '');
@@ -43,7 +42,7 @@ export function RechargeForm() {
     e.preventDefault();
     const accountName = username.trim() || user?.user;
     if (!accountName) {
-      setStatusMessage({ type: 'error', text: 'Vui lòng nhập tên tài khoản nhận Ruby.' });
+      setStatusMessage({ type: 'error', text: 'Vui lòng nhập tên tài khoản nhận Coin.' });
       return;
     }
     if (!serial.trim() || !pin.trim()) {
@@ -59,26 +58,17 @@ export function RechargeForm() {
       setIsSubmitting(false);
       setStatusMessage({
         type: 'success',
-        text: `Đã gửi thẻ ${selectedTelco} mệnh giá ${selectedDenom.label} cho tài khoản "${accountName}". Hệ thống đang xử lý, Ruby sẽ được cộng trong 30s!`,
+        text: `Đã gửi thẻ ${selectedTelco} mệnh giá ${selectedDenom.label} cho tài khoản "${accountName}". Coin sẽ được cộng sau khi đối tác xác nhận thẻ.`,
       });
       setSerial('');
       setPin('');
     }, 900);
   };
 
-  const totalRuby = selectedDenom.ruby + selectedDenom.bonus;
-
   return (
     <div className="recharge-layout">
       <div className="recharge-box">
         <div className="recharge-tabs">
-          <button
-            type="button"
-            className={`recharge-tab ${activeTab === 'card' ? 'is-active' : ''}`}
-            onClick={() => setActiveTab('card')}
-          >
-            💳 THẺ CÀO
-          </button>
           <button
             type="button"
             className={`recharge-tab ${activeTab === 'bank' ? 'is-active' : ''}`}
@@ -92,6 +82,13 @@ export function RechargeForm() {
             onClick={() => setActiveTab('momo')}
           >
             📱 VÍ MOMO
+          </button>
+          <button
+            type="button"
+            className={`recharge-tab ${activeTab === 'card' ? 'is-active' : ''}`}
+            onClick={() => setActiveTab('card')}
+          >
+            💳 THẺ CÀO
           </button>
         </div>
 
@@ -125,14 +122,14 @@ export function RechargeForm() {
                       onClick={() => setSelectedDenom(d)}
                     >
                       <strong>{d.label}</strong>
-                      <small>+{d.ruby + d.bonus} Ruby</small>
+                      <small>{d.coin.toLocaleString('vi-VN')} Coin</small>
                     </button>
                   ))}
                 </div>
               </div>
 
               <div className="form-row">
-                <label htmlFor="rec-username">3. Tên tài khoản nhận Ruby</label>
+                <label htmlFor="rec-username">3. Tên tài khoản nhận Coin</label>
                 <input
                   id="rec-username"
                   type="text"
@@ -168,8 +165,8 @@ export function RechargeForm() {
               </div>
 
               <div className="recharge-summary-box">
-                <span>Nhận được (Gốc + KM 20-50%):</span>
-                <strong>{totalRuby.toLocaleString('vi-VN')} RUBY</strong>
+                <span>Coin dự kiến sau khi thẻ được xác nhận:</span>
+                <strong>{selectedDenom.coin.toLocaleString('vi-VN')} COIN</strong>
               </div>
 
               {statusMessage && (
@@ -200,7 +197,7 @@ export function RechargeForm() {
                 <div className="bank-qr-mock">
                   <span style={{ fontSize: '28px', marginBottom: '4px' }}>📱</span>
                   <strong>VIETQR 24/7</strong>
-                  <span>Quét mã nạp tự động</span>
+                  <span>Kênh nạp ưu tiên</span>
                 </div>
                 <div className="bank-info-lines">
                   <p>Ngân hàng: <strong>MB BANK (Quân Đội)</strong></p>
@@ -210,13 +207,13 @@ export function RechargeForm() {
                     Cú pháp: <strong>HTTH {user?.user || 'TENTAIKHOAN'}</strong>
                   </p>
                   <p style={{ color: '#c62828', fontSize: '11px' }}>
-                    * Vui lòng ghi đúng cú pháp tên tài khoản để hệ thống tự động cộng Ruby sau 15-30 giây.
+                    * Ghi đúng nội dung để Coin được cộng vào đúng tài khoản sau khi giao dịch được xác nhận.
                   </p>
                 </div>
               </div>
               <div className="recharge-summary-box">
-                <span>Ưu đãi Chuyển khoản QR:</span>
-                <strong>+10% RUBY SO VỚI THẺ CÀO</strong>
+                <span>Chuyển khoản ngân hàng:</span>
+                <strong>1 VNĐ = 1 COIN</strong>
               </div>
             </div>
           )}
@@ -227,7 +224,7 @@ export function RechargeForm() {
                 <div className="bank-qr-mock" style={{ background: '#fdf2f8', borderColor: '#be185d' }}>
                   <span style={{ fontSize: '28px', marginBottom: '4px' }}>💖</span>
                   <strong style={{ color: '#be185d' }}>MOMO PAY</strong>
-                  <span>Tự động 24/7</span>
+                  <span>Nạp Coin bằng ví</span>
                 </div>
                 <div className="bank-info-lines">
                   <p>Ví điện tử: <strong>MoMo</strong></p>
@@ -237,13 +234,13 @@ export function RechargeForm() {
                     Lời nhắn: <strong>HTTH {user?.user || 'TENTAIKHOAN'}</strong>
                   </p>
                   <p style={{ color: '#be185d', fontSize: '11px' }}>
-                    * Hệ thống quét giao dịch MoMo tự động 24/7, cộng Ruby ngay tức thì.
+                    * Ghi đúng lời nhắn để Coin được cộng vào đúng tài khoản sau khi giao dịch được xác nhận.
                   </p>
                 </div>
               </div>
               <div className="recharge-summary-box">
-                <span>Ưu đãi Ví MoMo:</span>
-                <strong>KHUYẾN MÃI +25% RUBY</strong>
+                <span>Nạp qua Ví MoMo:</span>
+                <strong>1 VNĐ = 1 COIN</strong>
               </div>
             </div>
           )}
@@ -253,24 +250,22 @@ export function RechargeForm() {
       <aside className="recharge-sidebar-box">
         <div className="rate-card">
           <div className="rate-card__head">
-            <h3>BẢNG TỶ LỆ RUBY</h3>
-            <span>TỶ LỆ CHUẨN</span>
+            <h3>BẢNG NẠP COIN</h3>
+            <span>CHUYỂN KHOẢN / VÍ</span>
           </div>
           <div className="rate-card__body">
             <table className="rate-table">
               <thead>
                 <tr>
                   <th>Mệnh giá</th>
-                  <th>Ruby gốc</th>
-                  <th>Nhận thực tế</th>
+                  <th>Coin nhận</th>
                 </tr>
               </thead>
               <tbody>
                 {DENOMS.map((d) => (
                   <tr key={d.value}>
                     <td>{d.label}</td>
-                    <td>{d.ruby.toLocaleString('vi-VN')}</td>
-                    <td>{(d.ruby + d.bonus).toLocaleString('vi-VN')}</td>
+                    <td>{d.coin.toLocaleString('vi-VN')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -280,22 +275,22 @@ export function RechargeForm() {
 
         <div className="rate-card">
           <div className="rate-card__head">
-            <h3>MỐC VIP & QUÀ TẶNG</h3>
-            <span>TÍCH LŨY</span>
+            <h3>COIN DÙNG ĐỂ LÀM GÌ?</h3>
+            <span>NPC NAMI</span>
           </div>
           <div className="rate-card__body">
-            <ul className="vip-perks-list">
+            <ul className="coin-use-list">
               <li>
-                <strong>VIP 1 (50k):</strong> Nhận Rương Ác Quỷ Sơ Cấp + 100k Beri.
+                <strong>Mở thành viên:</strong> 10.000 Coin để mở giao dịch, chợ và chat thế giới.
               </li>
               <li>
-                <strong>VIP 3 (200k):</strong> Thú Cưỡi Tuần Lộc + Danh Hiệu Thuyền Trưởng.
+                <strong>Đổi Ruby:</strong> 10 Coin nhận 2 Ruby tại NPC Nami.
               </li>
               <li>
-                <strong>VIP 5 (500k):</strong> Rương Đại Ác Quỷ + Set Thời Trang Hải Tặc.
+                <strong>Đổi Beri:</strong> 1 Coin nhận 5.000 Beri tại NPC Nami.
               </li>
               <li>
-                <strong>VIP 10 (2tr):</strong> Trái Ác Quỷ Tự Chọn + Hiệu Ứng Hào Quang VIP.
+                <strong>Đổi Extol:</strong> 1.000 Ruby nhận 750.000 Extol tại NPC Nami.
               </li>
             </ul>
           </div>
