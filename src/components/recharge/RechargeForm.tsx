@@ -28,6 +28,7 @@ export function RechargeForm() {
   const [order, setOrder] = useState<PaymentOrder | null>(null);
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState<'account' | 'content' | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -123,6 +124,28 @@ export function RechargeForm() {
     window.setTimeout(() => setCopied(null), 1_500);
   }
 
+  async function reconcileOrders() {
+    if (reconciling) return;
+    setReconciling(true);
+    setError('');
+    try {
+      const reconciled = await paymentService.reconcileOrders();
+      const current = order
+        ? reconciled.find((candidate) => candidate.publicId === order.publicId)
+        : reconciled[reconciled.length - 1];
+      if (current) {
+        setOrder(current);
+        if (current.status === 'PAID' && pendingOrderStorageKey) {
+          window.localStorage.removeItem(pendingOrderStorageKey);
+        }
+      }
+    } catch (reason) {
+      setError(extractErrorMessage(reason));
+    } finally {
+      setReconciling(false);
+    }
+  }
+
   if (authLoading || loadingConfig) {
     return <div className="payment-loading" aria-label="Đang tải cổng nạp"><LoaderCircle aria-hidden="true" /><span>Đang kết nối cổng nạp an toàn…</span></div>;
   }
@@ -214,6 +237,9 @@ export function RechargeForm() {
           </div>
         </div>
         <div className="payment-waiting"><span /><div><strong>Đang chờ ngân hàng xác nhận</strong><small>Trang tự kiểm tra mỗi 3 giây, bạn không cần tải lại.</small></div></div>
+        <button className="payment-secondary-button" disabled={reconciling} type="button" onClick={() => { void reconcileOrders(); }}>
+          {reconciling ? <><LoaderCircle className="is-spinning" /> Đang đối soát…</> : <><RefreshCcw /> Tôi đã chuyển tiền · Kiểm tra ngay</>}
+        </button>
         <button className="payment-secondary-button" type="button" onClick={() => { if (pendingOrderStorageKey) window.localStorage.removeItem(pendingOrderStorageKey); setOrder(null); }}>Tạo đơn khác</button>
       </div>}
 
@@ -226,12 +252,19 @@ export function RechargeForm() {
       {order && ['EXPIRED', 'CANCELLED'].includes(order.status) && <div className="payment-result is-expired">
         <Clock3 aria-hidden="true" /><span>ĐƠN ĐÃ HẾT HẠN</span><h2>Tạo QR mới để tiếp tục</h2>
         <p>Không chuyển tiền bằng QR cũ. Giao dịch đến muộn sẽ được đưa vào đối soát thủ công.</p>
+        {order.status === 'EXPIRED' && <button type="button" disabled={reconciling} onClick={() => { void reconcileOrders(); }}>
+          {reconciling ? <><LoaderCircle className="is-spinning" /> Đang đối soát…</> : <><RefreshCcw /> Tôi đã chuyển tiền · Đối soát PayOS</>}
+        </button>}
         <button type="button" onClick={() => { if (pendingOrderStorageKey) window.localStorage.removeItem(pendingOrderStorageKey); setOrder(null); }}><RefreshCcw /> Tạo đơn mới</button>
       </div>}
 
       {order?.status === 'REVIEW' && <div className="payment-result is-review">
         <TriangleAlert aria-hidden="true" /><span>ĐANG ĐỐI SOÁT</span><h2>Giao dịch chưa khớp hoàn toàn</h2>
         <p>Hệ thống đã ghi nhận tiền vào nhưng số tiền hoặc thông tin đơn chưa đúng. Quản trị viên sẽ kiểm tra, không cần chuyển thêm.</p>
+        {error && <p className="payment-error" role="alert">{error}</p>}
+        <button type="button" disabled={reconciling} onClick={() => { void reconcileOrders(); }}>
+          {reconciling ? <><LoaderCircle className="is-spinning" /> Đang đối soát…</> : <><RefreshCcw /> Kiểm tra lại với PayOS</>}
+        </button>
       </div>}
     </section>
 
