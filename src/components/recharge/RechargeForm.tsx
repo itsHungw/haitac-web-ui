@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { QRCodeSVG } from 'qrcode.react';
 import {
-  BadgeCheck, Check, Clock3, Coins, Copy, Landmark, LoaderCircle, LockKeyhole,
-  QrCode, RefreshCcw, ShieldCheck, TriangleAlert,
+  ArrowRight, BadgeCheck, Banknote, Check, Clock3, Coins, Copy, Landmark,
+  LoaderCircle, LockKeyhole, QrCode, RefreshCcw, ShieldCheck, Smartphone,
+  TriangleAlert, UserRound,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/features/auth/hooks/useAuth';
@@ -14,7 +15,7 @@ import { extractErrorMessage } from '@/lib/api/errors';
 
 const number = new Intl.NumberFormat('vi-VN');
 const money = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
-const PRESETS = [10_000, 20_000, 50_000, 100_000, 200_000, 500_000, 1_000_000, 2_000_000, 5_000_000, 10_000_000];
+const PRESETS = [10_000, 50_000, 100_000, 200_000, 500_000, 1_000_000];
 
 function countdown(expiresAt: string, now: number) {
   const remaining = Math.max(0, Math.ceil((new Date(expiresAt).getTime() - now) / 1000));
@@ -52,7 +53,7 @@ export function RechargeForm() {
           try {
             const savedOrder = await paymentService.getOrder(savedOrderId);
             if (!cancelled) setOrder(savedOrder);
-            if (savedOrder.status !== 'PENDING') {
+            if (['PAID', 'CANCELLED'].includes(savedOrder.status)) {
               window.localStorage.removeItem(`htth:pending-payment:${user.user}`);
             }
           } catch {
@@ -73,7 +74,7 @@ export function RechargeForm() {
         const next = await paymentService.getOrder(order.publicId);
         if (!cancelled) {
           setOrder(next);
-          if (next.status !== 'PENDING' && pendingOrderStorageKey) {
+          if (['PAID', 'CANCELLED'].includes(next.status) && pendingOrderStorageKey) {
             window.localStorage.removeItem(pendingOrderStorageKey);
           }
         }
@@ -101,6 +102,14 @@ export function RechargeForm() {
     && parsedAmount >= config!.minAmountVnd
     && parsedAmount <= config!.maxAmountVnd
     && parsedAmount % config!.amountStepVnd === 0;
+  const formattedAmount = amount && Number.isFinite(parsedAmount) ? number.format(parsedAmount) : '';
+  const amountHint = !config
+    ? ''
+    : !amount
+    ? 'Nhập số tiền bạn muốn chuyển.'
+    : validAmount
+      ? `Bạn sẽ nhận ${number.format(parsedAmount * config.coinPerVnd)} Coin.`
+      : `Số tiền phải từ ${money.format(config.minAmountVnd)} đến ${money.format(config.maxAmountVnd)} và là bội số của ${money.format(config.amountStepVnd)}.`;
 
   async function createOrder() {
     if (!validAmount || creating) return;
@@ -147,7 +156,7 @@ export function RechargeForm() {
   }
 
   if (authLoading || loadingConfig) {
-    return <div className="payment-loading" aria-label="Đang tải cổng nạp"><LoaderCircle aria-hidden="true" /><span>Đang kết nối cổng nạp an toàn…</span></div>;
+    return <div className="payment-loading" role="status" aria-live="polite"><LoaderCircle aria-hidden="true" /><span>Đang chuẩn bị trang nạp Coin…</span></div>;
   }
 
   if (!user) {
@@ -163,18 +172,19 @@ export function RechargeForm() {
   if (!config) {
     return <section className="payment-gate is-unavailable">
       <TriangleAlert aria-hidden="true" />
-      <span>KHÔNG TẢI ĐƯỢC CỔNG NẠP</span>
-      <h2>Chưa thể lấy cấu hình payOS</h2>
-      <p>{error || 'Vui lòng tải lại trang hoặc quay lại sau.'}</p>
+      <span>TẠM THỜI GIÁN ĐOẠN</span>
+      <h2>Chưa thể mở kênh nạp Coin</h2>
+      <p>{error || 'Bạn chưa bị trừ tiền. Vui lòng tải lại trang sau ít phút.'}</p>
+      <button type="button" onClick={() => window.location.reload()}><RefreshCcw /> Tải lại trang</button>
     </section>;
   }
 
   if (!config.enabled && !order) {
     return <section className="payment-gate is-unavailable">
       <TriangleAlert aria-hidden="true" />
-      <span>PAYOS CHƯA SẴN SÀNG</span>
-      <h2>Kênh nạp đang được cấu hình</h2>
-      <p>{error || 'Quản trị viên cần tạo Kênh thanh toán payOS và xác nhận webhook trước khi nhận giao dịch thật.'}</p>
+      <span>KÊNH NẠP ĐANG TẠM ĐÓNG</span>
+      <h2>Chưa thể tạo mã thanh toán</h2>
+      <p>{error || 'Bạn chưa bị trừ tiền. Vui lòng quay lại sau.'}</p>
     </section>;
   }
 
@@ -182,98 +192,122 @@ export function RechargeForm() {
     <section className="payment-main">
       {!order && <>
         <header className="payment-heading">
-          <span><QrCode aria-hidden="true" /> VIETQR TỰ ĐỘNG 24/7</span>
-          <h2>Chọn số Coin muốn nạp</h2>
-          <p>Đơn thuộc tài khoản <strong>{user.user}</strong>. Tiền chuyển thẳng vào ngân hàng của máy chủ.</p>
+          <span><Coins aria-hidden="true" /> BƯỚC 1 TRÊN 3</span>
+          <h2>Chọn số tiền muốn nạp</h2>
+          <p>Chọn mệnh giá quen thuộc hoặc nhập số tiền khác. Bạn sẽ xem lại số Coin trước khi tạo mã.</p>
         </header>
 
-        <div className="payment-presets" aria-label="Mệnh giá nạp nhanh">
+        <div className="payment-account-chip">
+          <UserRound aria-hidden="true" />
+          <div><span>Coin sẽ vào tài khoản</span><strong>{user.user}</strong></div>
+          <small>Dùng chung cho mọi nhân vật</small>
+        </div>
+
+        <div className="payment-presets" role="group" aria-label="Chọn nhanh số tiền nạp">
           {selectablePresets.map((value) => <button
             className={parsedAmount === value ? 'is-selected' : ''}
             key={value}
             onClick={() => setAmount(String(value))}
             type="button"
-          ><strong>{value >= 1_000_000 ? `${value / 1_000_000} triệu` : `${number.format(value / 1_000)}K`}</strong><small>{number.format(value * config.coinPerVnd)} Coin</small></button>)}
+            aria-pressed={parsedAmount === value}
+          ><strong>{money.format(value)}</strong><small>Nhận {number.format(value * config.coinPerVnd)} Coin</small></button>)}
         </div>
 
-        <label className="payment-custom-amount" htmlFor="payment-amount">
-          <span>SỐ TIỀN KHÁC</span>
-          <div><input
+        <div className={`payment-custom-amount${amount && !validAmount ? ' is-invalid' : ''}`}>
+          <label htmlFor="payment-amount">Hoặc nhập số tiền khác</label>
+          <div><Banknote aria-hidden="true" /><input
             id="payment-amount"
             inputMode="numeric"
+            autoComplete="off"
             min={config.minAmountVnd}
             max={config.maxAmountVnd}
             step={config.amountStepVnd}
-            value={amount}
+            value={formattedAmount}
+            aria-describedby="payment-amount-hint"
+            aria-invalid={Boolean(amount && !validAmount)}
             onChange={(event) => setAmount(event.target.value.replace(/\D/g, ''))}
           /><b>VNĐ</b></div>
-          <small>Từ {money.format(config.minAmountVnd)} đến {money.format(config.maxAmountVnd)}, bước {money.format(config.amountStepVnd)}.</small>
-        </label>
+          <small id="payment-amount-hint">{amountHint}</small>
+        </div>
 
-        <div className="payment-order-summary">
-          <div><span>Bạn chuyển</span><strong>{Number.isFinite(parsedAmount) ? money.format(parsedAmount) : '—'}</strong></div>
-          <i aria-hidden="true">→</i>
-          <div><span>Tài khoản nhận</span><strong>{validAmount ? `${number.format(parsedAmount * config.coinPerVnd)} Coin` : '—'}</strong></div>
+        <div className="payment-order-summary" aria-label="Tóm tắt số tiền và Coin nhận được">
+          <div><span>Số tiền chuyển</span><strong>{validAmount ? money.format(parsedAmount) : '—'}</strong></div>
+          <ArrowRight aria-hidden="true" />
+          <div><span>Coin nhận được</span><strong>{validAmount ? `${number.format(parsedAmount * config.coinPerVnd)} Coin` : '—'}</strong></div>
         </div>
         {error && <p className="payment-error" role="alert">{error}</p>}
         <button className="payment-create-button" disabled={!validAmount || creating} onClick={() => { void createOrder(); }} type="button">
-          {creating ? <><LoaderCircle className="is-spinning" /> Đang tạo QR…</> : <><QrCode /> Tạo mã VietQR</>}
+          {creating ? <><LoaderCircle className="is-spinning" /> Đang tạo mã an toàn…</> : <><QrCode /> Tạo mã QR chuyển khoản</>}
         </button>
+        <p className="payment-submit-note"><ShieldCheck aria-hidden="true" /> Bạn chưa bị trừ tiền ở bước này.</p>
       </>}
 
       {order?.status === 'PENDING' && <div className="payment-pending">
-        <header><div><span>ĐƠN NẠP ĐANG CHỜ</span><h2>Quét QR để hoàn tất</h2></div><time><Clock3 /> {countdown(order.expiresAt, now)}</time></header>
+        <header>
+          <div><span><Smartphone aria-hidden="true" /> BƯỚC 2 TRÊN 3</span><h2>Quét mã bằng ứng dụng ngân hàng</h2><p>Thông tin chuyển khoản đã được điền sẵn trong mã QR.</p></div>
+          <time aria-label={`Mã còn hiệu lực ${countdown(order.expiresAt, now)}`}><Clock3 aria-hidden="true" /><small>Mã còn hiệu lực</small><strong>{countdown(order.expiresAt, now)}</strong></time>
+        </header>
         <div className="payment-qr-stage">
-          <div className="payment-qr-frame"><QRCodeSVG value={order.qrCode} size={320} level="M" marginSize={4} title={`Mã VietQR cho đơn ${order.publicId}`} /></div>
+          <div className="payment-qr-column">
+            <div className="payment-qr-frame"><QRCodeSVG value={order.qrCode} size={320} level="M" marginSize={4} title="Mã QR chuyển khoản ngân hàng" /></div>
+            <p>Mở ứng dụng ngân hàng và chọn <strong>Quét QR</strong></p>
+          </div>
           <div className="payment-bank-details">
-            <span><Landmark /> {order.bankCode}</span>
+            <span><Landmark aria-hidden="true" /> THÔNG TIN CHUYỂN KHOẢN</span>
             <h3>{order.bankAccountName}</h3>
             <dl>
-              <div><dt>Số tài khoản</dt><dd>{order.bankAccount}<button type="button" aria-label="Sao chép số tài khoản" onClick={() => { void copy(order.bankAccount, 'account'); }}>{copied === 'account' ? <Check /> : <Copy />}</button></dd></div>
-              <div><dt>Số tiền chính xác</dt><dd>{money.format(order.amountVnd)}</dd></div>
-              <div className="is-content"><dt>Nội dung bắt buộc</dt><dd>{order.transferContent}<button type="button" aria-label="Sao chép nội dung chuyển khoản" onClick={() => { void copy(order.transferContent, 'content'); }}>{copied === 'content' ? <Check /> : <Copy />}</button></dd></div>
+              <div><dt>Ngân hàng</dt><dd>{order.bankCode}</dd></div>
+              <div><dt>Số tài khoản nhận</dt><dd>{order.bankAccount}<button type="button" aria-label="Sao chép số tài khoản" onClick={() => { void copy(order.bankAccount, 'account'); }}>{copied === 'account' ? <><Check /> Đã chép</> : <><Copy /> Sao chép</>}</button></dd></div>
+              <div className="is-amount"><dt>Số tiền cần chuyển</dt><dd>{money.format(order.amountVnd)}</dd></div>
+              <div className="is-content"><dt>Nội dung chuyển khoản</dt><dd>{order.transferContent}<button type="button" aria-label="Sao chép nội dung chuyển khoản" onClick={() => { void copy(order.transferContent, 'content'); }}>{copied === 'content' ? <><Check /> Đã chép</> : <><Copy /> Sao chép</>}</button></dd></div>
             </dl>
-            <p><TriangleAlert /> Không sửa số tiền hoặc nội dung. Hệ thống chỉ cộng Coin khi khớp hoàn toàn.</p>
+            <p><TriangleAlert aria-hidden="true" /> Nếu nhập thủ công, hãy giữ nguyên số tiền và nội dung ở trên.</p>
           </div>
         </div>
-        <div className="payment-waiting"><span /><div><strong>Đang chờ ngân hàng xác nhận</strong><small>Trang tự kiểm tra mỗi 3 giây, bạn không cần tải lại.</small></div></div>
+        <div className="payment-waiting" role="status" aria-live="polite"><span /><div><strong>Đang chờ giao dịch hoàn tất</strong><small>Sau khi bạn chuyển khoản, Coin thường được cộng trong vài giây. Không cần tạo hoặc thanh toán thêm mã khác.</small></div></div>
+        {error && <p className="payment-error" role="alert">{error}</p>}
         <button className="payment-secondary-button" disabled={reconciling} type="button" onClick={() => { void reconcileOrders(); }}>
-          {reconciling ? <><LoaderCircle className="is-spinning" /> Đang đối soát…</> : <><RefreshCcw /> Tôi đã chuyển tiền · Kiểm tra ngay</>}
+          {reconciling ? <><LoaderCircle className="is-spinning" /> Đang kiểm tra giao dịch…</> : <><RefreshCcw /> Tôi đã chuyển tiền · Kiểm tra ngay</>}
         </button>
-        <button className="payment-secondary-button" type="button" onClick={() => { if (pendingOrderStorageKey) window.localStorage.removeItem(pendingOrderStorageKey); setOrder(null); }}>Tạo đơn khác</button>
       </div>}
 
       {order?.status === 'PAID' && <div className="payment-result is-paid">
-        <BadgeCheck aria-hidden="true" /><span>GIAO DỊCH THÀNH CÔNG</span><h2>Đã cộng {number.format(order.expectedCoin)} Coin</h2>
-        <p>Coin đã vào tài khoản <strong>{user.user}</strong>{order.coinBalance !== null ? ` · Số dư mới ${number.format(order.coinBalance)} Coin` : ''}.</p>
-        <div><Link href="/profile">Xem hồ sơ</Link><button type="button" onClick={() => { if (pendingOrderStorageKey) window.localStorage.removeItem(pendingOrderStorageKey); setOrder(null); }}>Nạp thêm</button></div>
+        <BadgeCheck aria-hidden="true" /><span>HOÀN TẤT · BƯỚC 3 TRÊN 3</span><h2>Nạp Coin thành công</h2>
+        <strong className="payment-result-amount">+{number.format(order.expectedCoin)} Coin</strong>
+        <p>Coin đã được cộng vào tài khoản <strong>{user.user}</strong>{order.coinBalance !== null ? ` · Số dư hiện tại ${number.format(order.coinBalance)} Coin` : ''}.</p>
+        <div><Link href="/profile">Xem Coin trong hồ sơ</Link><button type="button" onClick={() => { if (pendingOrderStorageKey) window.localStorage.removeItem(pendingOrderStorageKey); setOrder(null); }}>Nạp thêm</button></div>
       </div>}
 
       {order && ['EXPIRED', 'CANCELLED'].includes(order.status) && <div className="payment-result is-expired">
-        <Clock3 aria-hidden="true" /><span>ĐƠN ĐÃ HẾT HẠN</span><h2>Tạo QR mới để tiếp tục</h2>
-        <p>Không chuyển tiền bằng QR cũ. Giao dịch đến muộn sẽ được đưa vào đối soát thủ công.</p>
+        <Clock3 aria-hidden="true" /><span>MÃ THANH TOÁN ĐÃ HẾT HẠN</span><h2>Bạn đã chuyển tiền chưa?</h2>
+        <p>Nếu chưa chuyển, hãy tạo mã mới. Nếu đã chuyển, chọn kiểm tra giao dịch — tuyệt đối không chuyển thêm lần nữa.</p>
+        {error && <p className="payment-error" role="alert">{error}</p>}
         {order.status === 'EXPIRED' && <button type="button" disabled={reconciling} onClick={() => { void reconcileOrders(); }}>
-          {reconciling ? <><LoaderCircle className="is-spinning" /> Đang đối soát…</> : <><RefreshCcw /> Tôi đã chuyển tiền · Đối soát PayOS</>}
+          {reconciling ? <><LoaderCircle className="is-spinning" /> Đang kiểm tra giao dịch…</> : <><RefreshCcw /> Tôi đã chuyển tiền · Kiểm tra giao dịch</>}
         </button>}
-        <button type="button" onClick={() => { if (pendingOrderStorageKey) window.localStorage.removeItem(pendingOrderStorageKey); setOrder(null); }}><RefreshCcw /> Tạo đơn mới</button>
+        <button className="is-quiet" type="button" onClick={() => { if (pendingOrderStorageKey) window.localStorage.removeItem(pendingOrderStorageKey); setOrder(null); }}><QrCode /> Tôi chưa chuyển · Tạo mã mới</button>
       </div>}
 
       {order?.status === 'REVIEW' && <div className="payment-result is-review">
-        <TriangleAlert aria-hidden="true" /><span>ĐANG ĐỐI SOÁT</span><h2>Giao dịch chưa khớp hoàn toàn</h2>
-        <p>Hệ thống đã ghi nhận tiền vào nhưng số tiền hoặc thông tin đơn chưa đúng. Quản trị viên sẽ kiểm tra, không cần chuyển thêm.</p>
+        <RefreshCcw aria-hidden="true" /><span>ĐANG KIỂM TRA GIAO DỊCH</span><h2>Bạn không cần chuyển thêm</h2>
+        <p>Ngân hàng đã ghi nhận giao dịch nhưng hệ thống cần kiểm tra thêm trước khi cộng Coin. Hãy bấm kiểm tra lại sau vài giây.</p>
         {error && <p className="payment-error" role="alert">{error}</p>}
         <button type="button" disabled={reconciling} onClick={() => { void reconcileOrders(); }}>
-          {reconciling ? <><LoaderCircle className="is-spinning" /> Đang đối soát…</> : <><RefreshCcw /> Kiểm tra lại với PayOS</>}
+          {reconciling ? <><LoaderCircle className="is-spinning" /> Đang kiểm tra giao dịch…</> : <><RefreshCcw /> Kiểm tra lại</>}
         </button>
       </div>}
     </section>
 
     <aside className="payment-assurance">
-      <span>LUỒNG TIỀN MINH BẠCH</span>
-      <h3>Tiền vào thẳng ngân hàng</h3>
-      <ol><li><b>01</b><div><strong>Tạo đơn riêng</strong><small>Mỗi QR có mã không trùng.</small></div></li><li><b>02</b><div><strong>Chuyển khoản VietQR</strong><small>Tiền vào thẳng ngân hàng.</small></div></li><li><b>03</b><div><strong>payOS xác nhận</strong><small>Webhook được kiểm tra chữ ký.</small></div></li><li><b>04</b><div><strong>Coin được cộng</strong><small>Một giao dịch chỉ được cộng một lần.</small></div></li></ol>
-      <div className="payment-security-note"><ShieldCheck /><p><strong>Bảo vệ tự động</strong><br />Đúng tài khoản nhận · đúng số tiền · đúng mã đơn.</p></div>
-      <div className="payment-rate-note"><Coins /><p><span>TỶ LỆ HIỆN TẠI</span><strong>1 VNĐ = {config.coinPerVnd} Coin</strong></p></div>
+      <span>CHỈ 3 BƯỚC</span>
+      <h3>Nạp Coin dễ như chuyển khoản</h3>
+      <ol>
+        <li><b>01</b><div><strong>Chọn số tiền</strong><small>Biết trước chính xác số Coin sẽ nhận.</small></div></li>
+        <li><b>02</b><div><strong>Quét mã ngân hàng</strong><small>Số tiền và nội dung được điền sẵn.</small></div></li>
+        <li><b>03</b><div><strong>Nhận Coin tự động</strong><small>Coin vào tài khoản sau khi thanh toán.</small></div></li>
+      </ol>
+      <div className="payment-security-note"><ShieldCheck aria-hidden="true" /><p><strong>An toàn cho tài khoản</strong><br />Mỗi giao dịch chỉ được cộng Coin một lần, kể cả khi trang tải lại.</p></div>
+      <div className="payment-rate-note"><Coins aria-hidden="true" /><p><span>TỶ LỆ HIỆN TẠI</span><strong>1 VNĐ = {config.coinPerVnd} Coin</strong><small>Không thu thêm phí trên trang nạp.</small></p></div>
     </aside>
   </div>;
 }
